@@ -22,6 +22,11 @@
                 </div>
             </div>
             <p class="qid">题号：{{ qid }}</p>
+            
+            <!-- 额外提示信息 -->
+            <div v-if="extraMention" class="extra-mention">
+                {{ extraMention }}
+            </div>
 
             <!-- 简介音频 -->
             <div v-if="intro" class="section">
@@ -179,6 +184,7 @@ const title = computed(() => rows.value[0]?.title || 'Untitled')
 const intro = computed(() => rows.value[0]?.audio1 || null)
 const type  = computed(() => rows.value[0]?.type  || '')
 const date  = computed(() => rows.value[0]?.date  || '')
+const extraMention = computed(() => rows.value[0]?.extraMention || '')
 // 每两行构造一条对话：原文 + 译文
 const dialogs = computed(() => {
   const arr = []
@@ -820,5 +826,16 @@ h3 {
 
 .cancel-btn .material-icons {
   font-size: 20px;
+}
+
+.extra-mention {
+    background-color: #fff3cd;
+    border: 1px solid #ffeeba;
+    color: #856404;
+    padding: 12px 20px;
+    margin: 10px 0;
+    border-radius: 4px;
+    font-size: 14px;
+    line-height: 1.5;
 }
 </style>

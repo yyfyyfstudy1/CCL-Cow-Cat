@@ -32,7 +32,7 @@ async function loadExcel() {
         
         // 将 Excel 数据转换为数组，并指定列名
         const rows = XLSX.utils.sheet_to_json(sheet, {
-            header: ['qid', 'title', 'text', 'audio1', 'audio2', 'type', 'date'],
+            header: ['qid', 'title', 'text', 'audio1', 'audio2', 'type', 'date', 'extraMention'],
             range: 1  // 跳过标题行
         });
 
@@ -42,6 +42,7 @@ async function loadExcel() {
 
         console.log(`成功读取 ${rows.length} 行数据`);
         console.log('数据示例:', rows[0]);
+        console.log('extraMention 示例:', rows[0]?.extraMention);
 
         // 过滤掉空行
         state.rows = rows.filter(row => row.qid && row.qid.toString().trim());
