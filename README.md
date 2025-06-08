@@ -2,7 +2,7 @@
 
 CCL exam practice system
 
-A CCL exam practice system based on Python crawler, which automatically crawls the exam dialogues and questions on the specified website (such as https://cclcat.com), supports localized management and interactive practice.
+A CCL exam practice system based on Python crawler, which automatically crawls the exam dialogues and questions on the specified website, supports localized management and interactive practice.
 
 Function
 
