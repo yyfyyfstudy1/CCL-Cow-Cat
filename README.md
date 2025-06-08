@@ -1,5 +1,15 @@
 # Vue 3 + Vite
 
-This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+CCL exam practice system
 
-Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
+A CCL exam practice system based on Python crawler, which automatically crawls the exam dialogues and questions on the specified website (such as https://cclcat.com), supports localized management and interactive practice.
+
+Function
+
+🕷️ Automatic crawling: Batch crawl the dialogue list from the specified page, extract qid, type, date
+
+🔄 Full/incremental mode: supports full re-crawling and only supplementing missing fields
+
+🎧 Audio download: download audio files to your local computer
+
+📝 Practice mode: interactive CLI/GUI (to be expanded) practice question bank
