@@ -30,13 +30,7 @@ export async function checkTranslation(original, translation) {
    - Regular grammar/spelling mistake: –1 point each
    Minimum 0 （No negative points）.
 
-After deducting, sum the three components to get the final score (0–100). Then assign a band:
-
-90–100: Near-perfect; accurate and idiomatic  
-80–89: Few minor errors or 1–2 slight unnatural phrases  
-70–79: 1–2 minor errors or 1 major error  
-60–69: Multiple minor errors or ≥1 major error deduction  
-<60: ≥2 major errors or many minor errors  
+After deducting, sum the three components to get the final score (0–100). 
 
 请按以下格式输出中文解析的评估结果：
 
