@@ -18,17 +18,17 @@ export async function checkTranslation(original, translation) {
 1. Accuracy & Completeness (start at 70 points):
    - Major Error (omission/distortion/insertion that changes meaning): –5 points each
    - Minor Error (small omission or slight misinterpretation): –2 points each
-   Minimum 0.
+   Minimum 0 （No negative points）.
 
 2. Naturalness & Vocabulary (start at 20 points):
    - Clearly unnatural wording or literal calque: –2 points each
    - Slightly imprecise or repetitive word choice: –1 point each
-   Minimum 0.
+   Minimum 0 （No negative points）.
 
 3. Grammar & Mechanics (start at 10 points — ignore any missing punctuation, capitalization, or formatting issues; focus only on sentence structure and syntactic correctness).
    - Serious grammatical error that hinders understanding: –2 points each
    - Regular grammar/spelling mistake: –1 point each
-   Minimum 0.
+   Minimum 0 （No negative points）.
 
 After deducting, sum the three components to get the final score (0–100). Then assign a band:
 
