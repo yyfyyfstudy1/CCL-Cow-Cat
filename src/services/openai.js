@@ -12,26 +12,35 @@ export async function checkTranslation(original, translation) {
         model: "gpt-4o",
         messages: [{
           role: "system",
-          content: `你是一位专业的翻译评审专家。请对用户的翻译进行评估 (注意， 评分和评价的时候忽略转录中的标点符号的，大小写等书写问题，只关注翻译的准确性和自然度)，并按以下格式返回结果：
+          content: `
+ You are a translation-scoring assistant. You will be given an English translation of a Chinese source. Ignore missing punctuation, capitalization issue, and formatting when scoring—focus only on translation accuracy, naturalness, and grammar. Apply this 100-point rubric:
 
-评分标准（总分100分） (注意， 评分和评价的时候忽略转录中的标点符号的，大小写等书写问题，只关注翻译的准确性和自然度)：
-- 内容准确性与表达自然度（70分）：
-  * 90-100分：完整传达原文含义，用词可能不自然，但符合英语表达习惯
-  * 80-89分：基本传达原文含义，个别用词不符合英语表达习惯
-  * 70-79分：有小部分内容未翻译或理解偏差
-  * 60-69分：漏译或误译较多
-  * 60分以下：严重漏译或误译
+1. Accuracy & Completeness (start at 70 points):
+   - Major Error (omission/distortion/insertion that changes meaning): –5 points each
+   - Minor Error (small omission or slight misinterpretation): –2 points each
+   Minimum 0.
 
-- 语法正确性（30分）：
-  * 25-30分：基本无语法错误
-  * 20-24分：有1-2处小语法错误
-  * 15-19分：有多处语法错误但不影响理解
-  * 10-14分：语法错误较多且影响理解
-  * 10分以下：语法错误严重
+2. Naturalness & Vocabulary (start at 20 points):
+   - Clearly unnatural wording or literal calque: –2 points each
+   - Slightly imprecise or repetitive word choice: –1 point each
+   Minimum 0.
 
-请按以下格式输出评估结果：
+3. Grammar & Mechanics (start at 10 points — ignore any missing punctuation, capitalization, or formatting issues; focus only on sentence structure and syntactic correctness).
+   - Serious grammatical error that hinders understanding: –2 points each
+   - Regular grammar/spelling mistake: –1 point each
+   Minimum 0.
 
-1. 总分：[分数] (内容：[内容分]/70，语法：[语法分]/30)
+After deducting, sum the three components to get the final score (0–100). Then assign a band:
+
+90–100: Near-perfect; accurate and idiomatic  
+80–89: Few minor errors or 1–2 slight unnatural phrases  
+70–79: 1–2 minor errors or 1 major error  
+60–69: Multiple minor errors or ≥1 major error deduction  
+<60: ≥2 major errors or many minor errors  
+
+请按以下格式输出中文解析的评估结果：
+
+1. 总分：[分数] (准确性：[accuracy]/70，自然度:[naturalness]/20， 语法：[grammar]/10)
 2. 语法问题：[列出具体语法错误]
 3. 内容问题：
    - 错译：[指出误译部分]
@@ -40,7 +49,7 @@ export async function checkTranslation(original, translation) {
 4. 改进建议：[给出改进后的完整翻译]`
         }, {
           role: "user",
-          content: `原文：${original}\n用户翻译：${translation}\n请评估这个翻译。`
+          content: `原文：${original}\n用户翻译：${translation}\n。`
         }]
       })
     });
@@ -55,4 +64,4 @@ export async function checkTranslation(original, translation) {
     console.error('OpenAI API error:', error);
     throw error;
   }
-} 
+}
