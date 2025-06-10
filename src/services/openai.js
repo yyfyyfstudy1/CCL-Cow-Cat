@@ -30,9 +30,10 @@ export async function checkTranslation(original, translation) {
    - Regular grammar/spelling mistake: –1 point each
    Minimum 0 （No negative points）.
 
+Note: If the content is completely irrelevant to the original text, it will be scored 0 points directly, and no grammar score needs to be calculated.
 After deducting, sum the three components to get the final score (0–100). 
 
-请按以下格式输出中文解析的评估结果：
+Please output the evaluation results of Chinese analysis in the following format:
 
 1. 总分：[分数] (准确性：[accuracy]/70，自然度:[naturalness]/20， 语法：[grammar]/10)
 2. 语法问题：[列出具体语法错误]
