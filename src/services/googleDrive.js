@@ -2,6 +2,41 @@ class GoogleDriveService {
     constructor() {
         this.rootFolderId = import.meta.env.VITE_GOOGLE_DRIVE_ROOT_FOLDER_ID;
         this.accessToken = null;
+        this.clientIP = null;
+    }
+
+    // 获取客户端IP地址
+    async getClientIP() {
+        try {
+            const response = await fetch('https://api.ipify.org?format=json');
+            const data = await response.json();
+            return data.ip;
+        } catch (error) {
+            // console.error('获取IP地址失败:', error);
+            return 'unknown-ip';
+        }
+    }
+
+    // 检查必需的环境变量是否都存在
+    validateEnvironmentVariables() {
+        const requiredEnvVars = [
+            'VITE_GOOGLE_TYPE',
+            'VITE_GOOGLE_PROJECT_ID',
+            'VITE_GOOGLE_PRIVATE_KEY_ID',
+            'VITE_GOOGLE_PRIVATE_KEY',
+            'VITE_GOOGLE_CLIENT_EMAIL',
+            'VITE_GOOGLE_CLIENT_ID',
+            'VITE_GOOGLE_TOKEN_URI'
+        ];
+
+        const missingVars = requiredEnvVars.filter(varName => {
+            const value = import.meta.env[varName];
+            return value === undefined || value === null || value === '';
+        });
+
+        if (missingVars.length > 0) {
+            throw new Error(`缺少必需的环境变量: ${missingVars.join(', ')}`);
+        }
     }
 
     // 格式化日期为 "2024年03月21日" 格式
@@ -24,12 +59,15 @@ class GoogleDriveService {
 
     async initialize() {
         try {
+            // 首先验证环境变量
+            this.validateEnvironmentVariables();
+
             // 从环境变量获取服务账号信息
             const credentials = {
                 type: import.meta.env.VITE_GOOGLE_TYPE,
                 project_id: import.meta.env.VITE_GOOGLE_PROJECT_ID,
                 private_key_id: import.meta.env.VITE_GOOGLE_PRIVATE_KEY_ID,
-                private_key: import.meta.env.VITE_GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+                private_key: (import.meta.env.VITE_GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
                 client_email: import.meta.env.VITE_GOOGLE_CLIENT_EMAIL,
                 client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
                 token_uri: import.meta.env.VITE_GOOGLE_TOKEN_URI
@@ -146,12 +184,20 @@ class GoogleDriveService {
         }
 
         try {
-            // 获取当前日期作为文件夹名（例如：2024年03月21日）
-            const today = new Date();
-            const folderName = this.formatFolderDate(today);
+            // 获取IP地址（如果还没有获取）
+            if (!this.clientIP) {
+                this.clientIP = await this.getClientIP();
+            }
 
-            // 检查文件夹是否存在，不存在则创建
-            let folderId = await this.findOrCreateFolder(folderName);
+            // 获取当前日期作为子文件夹名（例如：2024年03月21日）
+            const today = new Date();
+            const dateFolderName = this.formatFolderDate(today);
+
+            // 首先创建或获取IP文件夹
+            const ipFolderId = await this.findOrCreateFolder(this.clientIP);
+
+            // 然后在IP文件夹下创建或获取日期文件夹
+            const dateFolderId = await this.findOrCreateFolder(dateFolderName, ipFolderId);
 
             // 生成文件名（例如：20240321-1430.wav）
             const baseFileName = this.formatFileName(today);
@@ -160,7 +206,7 @@ class GoogleDriveService {
             // 创建文件元数据
             const metadata = {
                 name: fullFileName,
-                parents: [folderId]
+                parents: [dateFolderId]  // 将文件放在日期文件夹下
             };
 
             // 创建 FormData
@@ -194,11 +240,16 @@ class GoogleDriveService {
         }
     }
 
-    async findOrCreateFolder(folderName) {
+    async findOrCreateFolder(folderName, parentFolderId = null) {
         try {
             // 构建查询条件
             let query = `mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`;
-            if (this.rootFolderId) {
+
+            // 如果指定了父文件夹，在父文件夹中查找
+            if (parentFolderId) {
+                query += ` and '${parentFolderId}' in parents`;
+            } else if (this.rootFolderId) {
+                // 如果没有指定父文件夹，但有根文件夹ID，则在根文件夹中查找
                 query += ` and '${this.rootFolderId}' in parents`;
             }
 
@@ -225,7 +276,8 @@ class GoogleDriveService {
             const metadata = {
                 name: folderName,
                 mimeType: 'application/vnd.google-apps.folder',
-                parents: this.rootFolderId ? [this.rootFolderId] : undefined
+                parents: parentFolderId ? [parentFolderId] :
+                        (this.rootFolderId ? [this.rootFolderId] : undefined)
             };
 
             const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
