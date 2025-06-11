@@ -147,6 +147,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useData } from '../services/useData.js'
 import { checkTranslation } from '../services/openai.js'
+import { googleDriveService } from '../services/googleDrive.js'
 
 const route = useRoute()
 const qid = route.params.qid
@@ -291,9 +292,18 @@ async function startRecording(dialogId) {
     try {
       isApiLoading.value = true
       aiCheckResult = await checkTranslation(originalText, translatedText)
+
+      // 生成文件名（使用当前时间，精确到分钟）
+      const now = new Date()
+      const filename = now.toISOString().replace(/[:.]/g, '-').split('.')[0] + '.wav'
+
+      // 上传到 Google Drive
+      const uploadResult = await googleDriveService.uploadAudio(blob, filename)
+    //   console.log('文件已上传到 Google Drive:', uploadResult.webViewLink)
+
     } catch (err) {
-      console.error('AI 翻译检查失败:', err)
-      aiCheckResult = '翻译检查失败'
+    //   console.error('AI 翻译检查或上传失败:', err)
+    //   aiCheckResult = '翻译检查失败'
     } finally {
       isApiLoading.value = false
     }
