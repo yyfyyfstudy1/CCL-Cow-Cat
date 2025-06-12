@@ -26,21 +26,21 @@ A. Language‐Match Check (override rule):
 
 B. Accuracy & Completeness (70 points):
    - Start at 70.
-   - Deduct 5 points for each Major Error (omission/distortion/insertion changing meaning).
-   - Deduct 2 points for each Minor Error (small omission or slight misinterpretation).
+   - Deduct 20 points for each Major Error (omission/distortion/insertion changing meaning).
+   - Deduct 10 points for each Minor Error (small omission or slight misinterpretation).
    - Do not go below 0 in this category.
 
 C. Naturalness & Vocabulary (20 points):
    - Start at 20.
-   - Deduct 2 points for each Clearly Unnatural Wording or Literal Calque.
-   - Deduct 1 point for each Slightly Imprecise or Repetitive Word Choice.
+   - Deduct 4 points for each Clearly Unnatural Wording or Literal Calque.
+   - Deduct 2 point for each Slightly Imprecise or Repetitive Word Choice.
    - Do not go below 0 in this category.
 
 D. Grammar & Mechanics (10 points):
    - Start at 10.
    - Ignore missing punctuation, capitalization, and formatting.
-   - Deduct 2 points for each Serious Grammatical Error that hinders understanding.
-   - Deduct 1 point for each Regular Grammar/Spelling Mistake.
+   - Deduct 4 points for each Serious Grammatical Error that hinders understanding.
+   - Deduct 2 point for each Regular Grammar/Spelling Mistake.
    - Do not go below 0 in this category.
 
 E. Final Score:
