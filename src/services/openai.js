@@ -13,25 +13,39 @@ export async function checkTranslation(original, translation) {
         messages: [{
           role: "system",
           content: `
- You are a translation-scoring assistant. You will be given an English translation of a Chinese source. Ignore missing punctuation, capitalization issue, and formatting when scoring—focus only on translation accuracy, naturalness, and grammar. Apply this 100-point rubric:
+ You are a translation‐scoring assistant. You will be given two inputs:
+1. original: the source text.
+2. translation: the user’s translation of original.
 
-1. Accuracy & Completeness (start at 70 points):
-   - Major Error (omission/distortion/insertion that changes meaning): –5 points each
-   - Minor Error (small omission or slight misinterpretation): –2 points each
-   Minimum 0 （No negative points）.
+Your task is to assign a score from 0 to 100 based on this rubric:
 
-2. Naturalness & Vocabulary (start at 20 points):
-   - Clearly unnatural wording or literal calque: –2 points each
-   - Slightly imprecise or repetitive word choice: –1 point each
-   Minimum 0 （No negative points）.
+A. Language‐Match Check (override rule):
+   - If original is in Chinese and translation is not in English, return score = 0 immediately.
+   - If original is in English and translation is not in Chinese, return score = 0 immediately.
+   - Otherwise continue to scoring below.
 
-3. Grammar & Mechanics (start at 10 points — ignore any missing punctuation, capitalization, or formatting issues; focus only on sentence structure and syntactic correctness).
-   - Serious grammatical error that hinders understanding: –2 points each
-   - Regular grammar/spelling mistake: –1 point each
-   Minimum 0 （No negative points）.
+B. Accuracy & Completeness (70 points):
+   - Start at 70.
+   - Deduct 5 points for each Major Error (omission/distortion/insertion changing meaning).
+   - Deduct 2 points for each Minor Error (small omission or slight misinterpretation).
+   - Do not go below 0 in this category.
 
-Note: If the content is completely irrelevant to the original text, it will be scored 0 points directly, and no grammar score needs to be calculated.
-After deducting, sum the three components to get the final score (0–100). 
+C. Naturalness & Vocabulary (20 points):
+   - Start at 20.
+   - Deduct 2 points for each Clearly Unnatural Wording or Literal Calque.
+   - Deduct 1 point for each Slightly Imprecise or Repetitive Word Choice.
+   - Do not go below 0 in this category.
+
+D. Grammar & Mechanics (10 points):
+   - Start at 10.
+   - Ignore missing punctuation, capitalization, and formatting.
+   - Deduct 2 points for each Serious Grammatical Error that hinders understanding.
+   - Deduct 1 point for each Regular Grammar/Spelling Mistake.
+   - Do not go below 0 in this category.
+
+E. Final Score:
+   - Sum A (if not overridden), B + C + D.
+   - Ensure final is between 0 and 100.
 
 Please output the evaluation results of Chinese analysis in the following format:
 
@@ -44,7 +58,7 @@ Please output the evaluation results of Chinese analysis in the following format
 4. 改进建议：[给出改进后的完整翻译]`
         }, {
           role: "user",
-          content: `原文：${original}\n用户翻译：${translation}\n。`
+          content: `original：${original}\ntranslation：${translation}\n。`
         }]
       })
     });

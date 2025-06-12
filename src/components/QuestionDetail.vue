@@ -231,9 +231,7 @@ onUnmounted(() => {
  */
 function detectLang(dialogId) {
   const txt = dialogs.value[dialogId]?.original.text || ''
-  console.log(txt)
-  console.log("wdwdwdwd")
-  return /[A-Za-z]/.test(txt) ? 'zh-CN' : 'en-US' 
+  return /[A-Za-z]/.test(txt) ? 'en' : 'zh'
 }
 
 /**
@@ -248,33 +246,12 @@ async function startRecording(dialogId) {
     audioChunks.value = []
     rec.ondataavailable = e => audioChunks.value.push(e.data)
 
-    // 3. 准备 SpeechRecognition
-    const lang = detectLang(dialogId)
-    const recognizer = new webkitSpeechRecognition()
-    recognizer.continuous = true
-    recognizer.interimResults = false
-    recognizer.lang = lang
-
-    let finalText = ''
-    recognizer.onresult = ev => {
-      for (let i = ev.resultIndex; i < ev.results.length; i++) {
-        if (ev.results[i].isFinal) {
-          finalText += ev.results[i][0].transcript
-        }
-      }
-    }
-    recognizer.onerror = () => { /* 可以记录错误 */ }
-
     const pStop = new Promise(res => rec.onstop = res)
-    const pEnd  = new Promise(res => recognizer.onend = res)
 
     rec.start()
-    recognizer.start()
     isRecording.value = true
 
     await pStop
-    recognizer.stop()
-    await pEnd
 
     // 如果是取消录音，直接返回
     if (isCancelled.value) {
@@ -282,28 +259,59 @@ async function startRecording(dialogId) {
     }
 
     const blob = new Blob(audioChunks.value, { type: 'audio/wav' })
-    const url  = URL.createObjectURL(blob)
+    const url = URL.createObjectURL(blob)
 
-    // 获取原文内容并调用 API
+    // 获取原文内容
     const originalText = dialogs.value[dialogId]?.original.text || ''
-    const translatedText = finalText.trim() || '未转录'
-
+    let translatedText = '未转录'
     let aiCheckResult = null
+
     try {
       isApiLoading.value = true
+
+      // 调用 Whisper API 进行转录
+      const formData = new FormData()
+      formData.append('file', blob, 'audio.wav')
+      formData.append('model', 'whisper-1')
+      formData.append('language', detectLang(dialogId) === 'zh' ? 'zh' : 'en')
+      formData.append('punctuate', 'true')
+
+      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`
+        },
+        body: formData
+      })
+
+      if (!response.ok) {
+        throw new Error('转录请求失败')
+      }
+
+      const result = await response.json()
+      translatedText = result.text.trim()
+
+      // AI 翻译评估
       aiCheckResult = await checkTranslation(originalText, translatedText)
 
       // 生成文件名（使用当前时间，精确到分钟）
       const now = new Date()
       const filename = now.toISOString().replace(/[:.]/g, '-').split('.')[0] + '.wav'
 
-      // 上传到 Google Drive
-      const uploadResult = await googleDriveService.uploadAudio(blob, filename)
-    //   console.log('文件已上传到 Google Drive:', uploadResult.webViewLink)
+      // 异步上传到 Google Drive
+      const blobCopy = blob.slice(0) // 创建 blob 的副本
+      Promise.resolve().then(async () => {
+        try {
+          const uploadResult = await googleDriveService.uploadAudio(blobCopy, filename)
+        //   console.log('文件已异步上传到 Google Drive')
+        } catch (err) {
+        //   console.error('Google Drive 上传失败:', err)
+        }
+      })
 
     } catch (err) {
-    //   console.error('AI 翻译检查或上传失败:', err)
-    //   aiCheckResult = '翻译检查失败'
+      console.error('语音转录或翻译检查失败:', err)
+      aiCheckResult = '转录或翻译检查失败'
     } finally {
       isApiLoading.value = false
     }
@@ -317,8 +325,8 @@ async function startRecording(dialogId) {
     })
 
   } catch (err) {
-    console.error('录音/识别失败', err)
-    alert('无法访问麦克风或识别服务，请检查权限和浏览器支持')
+    console.error('录音失败', err)
+    alert('无法访问麦克风，请检查权限')
   } finally {
     if (mediaRecorder.value) {
       mediaRecorder.value.stream.getTracks().forEach(t => t.stop())
