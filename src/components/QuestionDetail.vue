@@ -242,9 +242,9 @@ onUnmounted(() => {
  */
 function detectLang(dialogId) {
   const txt = dialogs.value[dialogId]?.original.text || ''
-  console.log('detectLang================')
-  console.log(txt)
-  console.log(/[A-Za-z]/.test(txt) ? 'zh' : 'en')
+  // console.log('detectLang================')
+  // console.log(txt)
+  // console.log(/[A-Za-z]/.test(txt) ? 'zh' : 'en')
   return /[A-Za-z]/.test(txt) ? 'zh' : 'en'
 }
 
@@ -394,6 +394,8 @@ async function startRecording(dialogId) {
       formData.append('model', 'whisper-1')
       formData.append('language', detectLang(dialogId) === 'zh' ? 'zh' : 'en')
       formData.append('punctuate', 'true')
+      formData.append('response_format', 'text')
+      formData.append('prompt', '请使用简体中文输出')
 
       const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
         method: 'POST',
@@ -407,11 +409,12 @@ async function startRecording(dialogId) {
         throw new Error('转录请求失败')
       }
 
-      const result = await response.json()
-      translatedText = result.text.trim()
+      // 直接获取文本响应
+      const translatedText = await response.text()
+      const trimmedText = translatedText.trim()
 
       // AI 翻译评估
-      aiCheckResult = await checkTranslation(originalText, translatedText)
+      aiCheckResult = await checkTranslation(originalText, trimmedText)
 
       // 生成文件名（使用当前时间，精确到分钟）
       const now = new Date()
@@ -425,8 +428,16 @@ async function startRecording(dialogId) {
           const wavBlob = await convertToWav(blobCopy)
           const uploadResult = await googleDriveService.uploadAudio(wavBlob, filename)
         } catch (err) {
-          console.error('Google Drive 上传失败:', err)
+          // console.error('Google Drive 上传失败:', err)
         }
+      })
+
+      if (!recordingsList.value[dialogId]) recordingsList.value[dialogId] = []
+      recordingsList.value[dialogId].push({
+        url,
+        text: trimmedText,
+        timestamp: new Date().toLocaleString(),
+        aiCheck: aiCheckResult
       })
 
     } catch (err) {
@@ -435,14 +446,6 @@ async function startRecording(dialogId) {
     } finally {
       isApiLoading.value = false
     }
-
-    if (!recordingsList.value[dialogId]) recordingsList.value[dialogId] = []
-    recordingsList.value[dialogId].push({
-      url,
-      text: translatedText,
-      timestamp: new Date().toLocaleString(),
-      aiCheck: aiCheckResult
-    })
 
   } catch (err) {
     console.error('录音失败', err)
