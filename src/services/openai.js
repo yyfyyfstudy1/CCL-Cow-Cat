@@ -1,65 +1,16 @@
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
+const LAMBDA_URL = import.meta.env.VITE_LAMBDA_URL;
 
 export async function checkTranslation(original, translation) {
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(LAMBDA_URL, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: "gpt-4o",
-        messages: [{
-          role: "system",
-          content: `
- You are a translation‐scoring assistant. You will be given two inputs:
-1. original: the source text.
-2. translation: the user’s translation of original.
-
-Your task is to assign a score from 0 to 100 based on this rubric:
-
-A. Language‐Match Check (override rule):
-   - If original is in Chinese and translation is not in English, return score = 0 immediately.
-   - If original is in English and translation is not in Chinese, return score = 0 immediately.
-   - Otherwise continue to scoring below.
-
-B. Accuracy & Completeness (70 points):
-   - Start at 70.
-   - Deduct 20 points for each Major Error (omission/distortion/insertion changing meaning).
-   - Deduct 10 points for each Minor Error (small omission or slight misinterpretation).
-   - Do not go below 0 in this category.
-
-C. Naturalness & Vocabulary (20 points):
-   - Start at 20.
-   - Deduct 4 points for each Clearly Unnatural Wording or Literal Calque.
-   - Deduct 2 point for each Slightly Imprecise or Repetitive Word Choice.
-   - Do not go below 0 in this category.
-
-D. Grammar & Mechanics (10 points):
-   - Start at 10.
-   - Ignore missing punctuation, capitalization, and formatting.
-   - Deduct 4 points for each Serious Grammatical Error that hinders understanding.
-   - Deduct 2 point for each Regular Grammar/Spelling Mistake.
-   - Do not go below 0 in this category.
-
-E. Final Score:
-   - Sum A (if not overridden), B + C + D.
-   - Ensure final is between 0 and 100.
-
-Please output the evaluation results of Chinese analysis in the following format:
-
-1. 总分：[分数] (准确性：[accuracy]/70，自然度:[naturalness]/20， 语法：[grammar]/10)
-2. 语法问题：[列出具体语法错误]
-3. 内容问题：
-   - 错译：[指出误译部分]
-   - 漏译：[指出遗漏内容]
-   - 不自然表达：[指出不符合英语习惯的表达]
-4. 改进建议：[给出改进后的完整翻译]`
-        }, {
-          role: "user",
-          content: `original：${original}\ntranslation：${translation}\n。`
-        }]
+        endpoint: 'chat',
+        original,
+        translation
       })
     });
 
@@ -70,7 +21,63 @@ Please output the evaluation results of Chinese analysis in the following format
     const data = await response.json();
     return data.choices[0].message.content;
   } catch (error) {
-    console.error('OpenAI API error:', error);
+    console.error('Lambda API error:', error);
     throw error;
   }
+}
+
+export async function transcribeAudio(audioBlob, language, prompt) {
+  try {
+    // 将音频文件转换为base64
+    const base64Audio = await fileToBase64(audioBlob);
+
+    const response = await fetch(LAMBDA_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        endpoint: 'transcription',
+        audio: base64Audio,
+        language,
+        prompt
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('API request failed');
+    }
+
+    const data = await response.json();
+    return data.text;
+  } catch (error) {
+    console.error('Lambda API error:', error);
+    throw error;
+  }
+}
+
+
+// 辅助函数：将文件转换为base64
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      // 移除 Data URL 前缀（例如："data:audio/mpeg;base64,"）
+      const base64 = reader.result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = error => reject(error);
+  });
+}
+
+// 辅助函数：将base64转换为Blob
+function base64ToBlob(base64, type = 'application/octet-stream') {
+  const binaryString = window.atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return new Blob([bytes], { type });
 }

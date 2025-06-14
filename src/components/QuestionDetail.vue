@@ -147,7 +147,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useData } from '../services/useData.js'
-import { checkTranslation } from '../services/openai.js'
+import { checkTranslation, transcribeAudio } from '../services/openai.js'
 import { googleDriveService } from '../services/googleDrive.js'
 import NotificationBanner from './NotificationBanner.vue'
 
@@ -388,29 +388,12 @@ async function startRecording(dialogId) {
     try {
       isApiLoading.value = true
 
-      // 调用 Whisper API 进行转录
-      const formData = new FormData()
-      formData.append('file', blob, 'audio.m4a')
-      formData.append('model', 'whisper-1')
-      formData.append('language', detectLang(dialogId) === 'zh' ? 'zh' : 'en')
-      formData.append('punctuate', 'true')
-      formData.append('response_format', 'text')
-      formData.append('prompt', '请使用简体中文输出')
-
-      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`
-        },
-        body: formData
-      })
-
-      if (!response.ok) {
-        throw new Error('转录请求失败')
-      }
-
-      // 直接获取文本响应
-      const translatedText = await response.text()
+      // 调用音频转录服务
+      const translatedText = await transcribeAudio(
+        blob,
+        detectLang(dialogId),
+        detectLang(dialogId) === 'zh' ? '请返回简体中文' : 'Please return in English'
+      )
       const trimmedText = translatedText.trim()
 
       // AI 翻译评估
