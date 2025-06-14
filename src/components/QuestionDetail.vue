@@ -227,11 +227,14 @@ onUnmounted(() => {
 
 /**
  * 根据对话原文内容自动选择识别语言
- * 英文原文则 en-US，否则用 zh-CN
+ * 英文原文则 en-US，否则用 zh-CN 原文是中文，就要转成英语。原文是英语，转译中文
  */
 function detectLang(dialogId) {
   const txt = dialogs.value[dialogId]?.original.text || ''
-  return /[A-Za-z]/.test(txt) ? 'en' : 'zh'
+  console.log('detectLang================')
+  console.log(txt)
+  console.log(/[A-Za-z]/.test(txt) ? 'zh' : 'en')
+  return /[A-Za-z]/.test(txt) ? 'zh' : 'en'
 }
 
 /**
