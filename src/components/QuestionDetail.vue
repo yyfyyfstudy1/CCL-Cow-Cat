@@ -237,14 +237,117 @@ function detectLang(dialogId) {
   return /[A-Za-z]/.test(txt) ? 'zh' : 'en'
 }
 
+async function convertToWav(audioBlob) {
+  try {
+    // 创建音频上下文
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+    
+    // 将 Blob 转换为 ArrayBuffer
+    const arrayBuffer = await audioBlob.arrayBuffer()
+    
+    // 解码音频数据
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+    
+    // 创建离线音频上下文
+    const offlineContext = new OfflineAudioContext(
+      audioBuffer.numberOfChannels,
+      audioBuffer.length,
+      audioBuffer.sampleRate
+    )
+    
+    // 创建音频源
+    const source = offlineContext.createBufferSource()
+    source.buffer = audioBuffer
+    source.connect(offlineContext.destination)
+    source.start(0)
+    
+    // 渲染音频
+    const renderedBuffer = await offlineContext.startRendering()
+    
+    // 将音频数据转换为 WAV 格式
+    const wavBlob = await audioBufferToWav(renderedBuffer)
+    
+    return wavBlob
+  } catch (err) {
+    console.error('音频转换失败:', err)
+    return audioBlob // 如果转换失败，返回原始音频
+  }
+}
+
+// 将 AudioBuffer 转换为 WAV 格式
+function audioBufferToWav(buffer) {
+  const numOfChan = buffer.numberOfChannels
+  const length = buffer.length * numOfChan * 2
+  const buffer2 = new ArrayBuffer(44 + length)
+  const view = new DataView(buffer2)
+  const channels = []
+  let sample
+  let offset = 0
+  let pos = 0
+
+  // 写入 WAV 文件头
+  setUint32(0x46464952)                         // "RIFF"
+  setUint32(36 + length)                        // 文件长度
+  setUint32(0x45564157)                         // "WAVE"
+  setUint32(0x20746d66)                         // "fmt " chunk
+  setUint32(16)                                 // 长度 = 16
+  setUint16(1)                                  // PCM (uncompressed)
+  setUint16(numOfChan)
+  setUint32(buffer.sampleRate)
+  setUint32(buffer.sampleRate * 2 * numOfChan)  // avg. bytes/sec
+  setUint16(numOfChan * 2)                      // block-align
+  setUint16(16)                                 // 16-bit
+  setUint32(0x61746164)                         // "data" - chunk
+  setUint32(length)                             // chunk length
+
+  // 写入音频数据
+  for (let i = 0; i < buffer.numberOfChannels; i++) {
+    channels.push(buffer.getChannelData(i))
+  }
+
+  while (pos < buffer.length) {
+    for (let i = 0; i < numOfChan; i++) {
+      sample = Math.max(-1, Math.min(1, channels[i][pos]))
+      sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0
+      view.setInt16(44 + offset, sample, true)
+      offset += 2
+    }
+    pos++
+  }
+
+  return new Blob([buffer2], { type: 'audio/wav' })
+
+  function setUint16(data) {
+    view.setUint16(pos, data, true)
+    pos += 2
+  }
+
+  function setUint32(data) {
+    view.setUint32(pos, data, true)
+    pos += 4
+  }
+}
+
 /**
  * 开始录音并进行语音识别
  */
 async function startRecording(dialogId) {
   try {
-    isCancelled.value = false  // 重置取消标志
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    const rec = new MediaRecorder(stream)
+    isCancelled.value = false
+    const stream = await navigator.mediaDevices.getUserMedia({ 
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        sampleRate: 44100,
+        channelCount: 1
+      } 
+    })
+    
+    const rec = new MediaRecorder(stream, {
+      mimeType: 'audio/mp4',
+      audioBitsPerSecond: 128000
+    })
+    
     mediaRecorder.value = rec
     audioChunks.value = []
     rec.ondataavailable = e => audioChunks.value.push(e.data)
@@ -261,7 +364,9 @@ async function startRecording(dialogId) {
       return
     }
 
-    const blob = new Blob(audioChunks.value, { type: 'audio/wav' })
+    const blob = new Blob(audioChunks.value, { 
+      type: 'audio/mp4'
+    })
     const url = URL.createObjectURL(blob)
 
     // 获取原文内容
@@ -274,7 +379,7 @@ async function startRecording(dialogId) {
 
       // 调用 Whisper API 进行转录
       const formData = new FormData()
-      formData.append('file', blob, 'audio.wav')
+      formData.append('file', blob, 'audio.m4a')
       formData.append('model', 'whisper-1')
       formData.append('language', detectLang(dialogId) === 'zh' ? 'zh' : 'en')
       formData.append('punctuate', 'true')
@@ -302,13 +407,14 @@ async function startRecording(dialogId) {
       const filename = now.toISOString().replace(/[:.]/g, '-').split('.')[0] + '.wav'
 
       // 异步上传到 Google Drive
-      const blobCopy = blob.slice(0) // 创建 blob 的副本
+      const blobCopy = blob.slice(0)
       Promise.resolve().then(async () => {
         try {
-          const uploadResult = await googleDriveService.uploadAudio(blobCopy, filename)
-        //   console.log('文件已异步上传到 Google Drive')
+          // 转换为 WAV 格式
+          const wavBlob = await convertToWav(blobCopy)
+          const uploadResult = await googleDriveService.uploadAudio(wavBlob, filename)
         } catch (err) {
-        //   console.error('Google Drive 上传失败:', err)
+          console.error('Google Drive 上传失败:', err)
         }
       })
 

@@ -199,13 +199,9 @@ class GoogleDriveService {
             // 然后在IP文件夹下创建或获取日期文件夹
             const dateFolderId = await this.findOrCreateFolder(dateFolderName, ipFolderId);
 
-            // 生成文件名（例如：20240321-1430.wav）
-            const baseFileName = this.formatFileName(today);
-            const fullFileName = `${baseFileName}.wav`;
-
             // 创建文件元数据
             const metadata = {
-                name: fullFileName,
+                name: filename,  // 使用传入的文件名
                 parents: [dateFolderId]  // 将文件放在日期文件夹下
             };
 
