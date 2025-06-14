@@ -1,5 +1,6 @@
 <template>
     <div class="container">
+        <NotificationBanner />
         <h1 style="font-size:24px;font-weight:700;margin-bottom:24px">
             对话列表
         </h1>
@@ -61,6 +62,7 @@ import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useData } from '../services/useData.js';
 import FilterPanel from './FilterPanel.vue';
+import NotificationBanner from './NotificationBanner.vue'
 
 const router = useRouter();
 const cur = ref(1);

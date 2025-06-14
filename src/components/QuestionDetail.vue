@@ -1,5 +1,6 @@
 <template>
     <div class="container">
+        <NotificationBanner />
         <a class="back" @click="$router.back()">← 返回</a>
 
         <div v-if="error" class="error">
@@ -148,6 +149,7 @@ import { useRoute } from 'vue-router'
 import { useData } from '../services/useData.js'
 import { checkTranslation } from '../services/openai.js'
 import { googleDriveService } from '../services/googleDrive.js'
+import NotificationBanner from './NotificationBanner.vue'
 
 const route = useRoute()
 const qid = route.params.qid
@@ -170,6 +172,9 @@ const isApiLoading = ref(false)
 
 // 新增：取消标志
 const isCancelled = ref(false)
+
+// 添加提示框状态
+const showNotification = ref(false)
 
 const { loadExcel, data } = useData()
 async function retryLoad() {
@@ -217,6 +222,12 @@ function audioSrc(rel) {
 
 onMounted(() => {
   chimeAudio.value = new Audio('/chime.mp4')
+
+  // 检查是否显示过提示
+  const hasShownNotification = localStorage.getItem('hasShownNotification')
+  if (!hasShownNotification) {
+    showNotification.value = true
+  }
 })
 onUnmounted(() => {
   // 卸载时释放所有 Blob URL
@@ -488,11 +499,13 @@ function cancelRecording() {
     audioChunks.value = []
   }
 }
+
+// 关闭提示框并存储状态
+function closeNotification() {
+    showNotification.value = false
+    localStorage.setItem('hasShownNotification', 'true')
+}
 </script>
-
-
-
-
 
 <style scoped>
 .container {
@@ -964,5 +977,48 @@ h3 {
     border-radius: 4px;
     font-size: 14px;
     line-height: 1.5;
+}
+
+/* 添加提示框样式 */
+.notification {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    width: 90%;
+    max-width: 600px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.notification-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.notification-content p {
+    margin: 0;
+    color: #333;
+    line-height: 1.5;
+}
+
+.notification-close {
+    align-self: flex-end;
+    padding: 8px 16px;
+    background: #1976d2;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.notification-close:hover {
+    background: #1565c0;
 }
 </style>
