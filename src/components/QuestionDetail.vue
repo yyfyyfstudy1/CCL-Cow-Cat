@@ -23,7 +23,7 @@
                 </div>
             </div>
             <p class="qid">题号：{{ qid }}</p>
-            
+
             <!-- 额外提示信息 -->
             <div v-if="extraMention" class="extra-mention">
                 {{ extraMention }}
@@ -38,7 +38,7 @@
             <!-- 对话内容 -->
             <div v-for="(dialog, idx) in dialogs" :key="idx" class="section">
                 <h3>对话 {{ idx + 1 }}</h3>
-                
+
                 <!-- 原文部分 -->
                 <div class="dialog-part">
                     <div class="content-header">
@@ -52,9 +52,9 @@
                             {{ dialog.original.text }}
                         </p>
                     </transition>
-                    <audio 
-                        :src="audioSrc(dialog.original.audio)" 
-                        controls 
+                    <audio
+                        :src="audioSrc(dialog.original.audio)"
+                        controls
                         class="audio"
                         @ended="handleOriginalAudioEnd(idx)"
                     />
@@ -63,7 +63,7 @@
                 <!-- 翻译部分 -->
                 <div class="dialog-part">
                     <div class="content-header">
-                        <div class="label">翻译</div>
+                        <div class="label">参考翻译</div>
                         <button class="toggle-btn" @click="toggleDialog(idx, 'translation')">
                             {{ isDialogOpen(idx, 'translation') ? '隐藏' : '显示' }}
                         </button>
@@ -79,9 +79,9 @@
                 <!-- 录音部分 -->
                 <div class="recording-section">
                     <div class="record-btn-container">
-                        <button 
-                            class="record-btn" 
-                            :class="{ 
+                        <button
+                            class="record-btn"
+                            :class="{
                                 recording: isRecording,
                                 'api-loading': isApiLoading && !isRecording
                             }"
@@ -91,9 +91,9 @@
                             <span class="material-icons">{{ isRecording ? 'stop' : 'mic' }}</span>
                             {{ isRecording ? '停止录音' : (isApiLoading ? '处理中...' : '开始录音') }}
                         </button>
-                        
+
                         <!-- 新增取消按钮 -->
-                        <button 
+                        <button
                             v-if="isRecording"
                             class="cancel-btn"
                             @click="cancelRecording"
@@ -107,10 +107,10 @@
                         <div class="recording-header">
                             <span class="label">当前录音</span>
                         </div>
-                        
+
                         <div class="recordings-list">
-                            <div v-for="(recording, rIdx) in recordingsList[idx]" 
-                                :key="rIdx" 
+                            <div v-for="(recording, rIdx) in recordingsList[idx]"
+                                :key="rIdx"
                                 class="recording-item"
                             >
                                 <div class="recording-controls">
@@ -123,7 +123,7 @@
                                 </div>
                                 <div class="recording-text">{{ recording.text || '未转录' }}</div>
                                 <div class="recording-time">{{ recording.timestamp }}</div>
-                                
+
                                 <!-- AI 翻译检查结果 -->
                                 <div v-if="recording.aiCheck" class="ai-check">
                                     <div class="ai-check-header">
@@ -252,32 +252,32 @@ async function convertToWav(audioBlob) {
   try {
     // 创建音频上下文
     const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-    
+
     // 将 Blob 转换为 ArrayBuffer
     const arrayBuffer = await audioBlob.arrayBuffer()
-    
+
     // 解码音频数据
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
-    
+
     // 创建离线音频上下文
     const offlineContext = new OfflineAudioContext(
       audioBuffer.numberOfChannels,
       audioBuffer.length,
       audioBuffer.sampleRate
     )
-    
+
     // 创建音频源
     const source = offlineContext.createBufferSource()
     source.buffer = audioBuffer
     source.connect(offlineContext.destination)
     source.start(0)
-    
+
     // 渲染音频
     const renderedBuffer = await offlineContext.startRendering()
-    
+
     // 将音频数据转换为 WAV 格式
     const wavBlob = await audioBufferToWav(renderedBuffer)
-    
+
     return wavBlob
   } catch (err) {
     console.error('音频转换失败:', err)
@@ -345,20 +345,20 @@ function audioBufferToWav(buffer) {
 async function startRecording(dialogId) {
   try {
     isCancelled.value = false
-    const stream = await navigator.mediaDevices.getUserMedia({ 
+    const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
         noiseSuppression: true,
         sampleRate: 44100,
         channelCount: 1
-      } 
+      }
     })
-    
+
     const rec = new MediaRecorder(stream, {
       mimeType: 'audio/mp4',
       audioBitsPerSecond: 128000
     })
-    
+
     mediaRecorder.value = rec
     audioChunks.value = []
     rec.ondataavailable = e => audioChunks.value.push(e.data)
@@ -375,7 +375,7 @@ async function startRecording(dialogId) {
       return
     }
 
-    const blob = new Blob(audioChunks.value, { 
+    const blob = new Blob(audioChunks.value, {
       type: 'audio/mp4'
     })
     const url = URL.createObjectURL(blob)
