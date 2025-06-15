@@ -177,6 +177,8 @@ const isCancelled = ref(false)
 const showNotification = ref(false)
 
 const { loadExcel, data } = useData()
+const S3_BASE_URL = "https://cclcowcatresource.s3.ap-southeast-2.amazonaws.com";
+
 async function retryLoad() {
   error.value = null
   try { await loadExcel() }
@@ -217,7 +219,7 @@ function isDialogOpen(idx, type) {
   return !!dialogStates.value[getDialogKey(idx, type)]
 }
 function audioSrc(rel) {
-  return rel ? `/audio${rel}` : ''
+  return rel ? `${S3_BASE_URL}/audio${rel}` : '';
 }
 
 onMounted(() => {

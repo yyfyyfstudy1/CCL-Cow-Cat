@@ -8,19 +8,23 @@ const state = reactive({
     byQid: {}
 });
 
+const S3_BASE_URL = "https://cclcowcatresource.s3.ap-southeast-2.amazonaws.com";
+
 async function loadExcel() {
     if (state.loaded) return;
 
     try {
         console.log('开始加载 Excel 文件...');
-        const res = await fetch('/excel/result.xlsx');
+        console.log(S3_BASE_URL);
+        const res = await fetch(`${S3_BASE_URL}/excel/result.xlsx`);
         
         if (!res.ok) {
             throw new Error(`Failed to fetch Excel file: ${res.status} ${res.statusText}`);
         }
 
         console.log('Excel 文件获取成功，开始解析...');
-        const ab = await res.arrayBuffer();
+        const blob = await res.blob(); // 将响应转换为 Blob 对象
+        const ab = await blob.arrayBuffer(); // 将 Blob 转换为 ArrayBuffer
         const wb = XLSX.read(ab, { type: 'array' });
         
         if (!wb.SheetNames.length) {
@@ -61,9 +65,8 @@ async function loadExcel() {
         state.loaded = true;
 
     } catch (err) {
-        console.error('加载 Excel 时发生错误:', err);
+        console.error('加载 Excel 文件失败:', err);
         state.error = err.message;
-        throw err;
     }
 }
 
