@@ -1,7 +1,7 @@
 <template>
     <div v-if="showNotification" class="notification">
         <div class="notification-content">
-            <p>根据一些朋友反馈，已经修复了音频转录中英文混乱，在Iphone和微信的浏览器中无法录音的问题，大家可以刷新一下网站。</p>
+            <p>备考期间突然发现还是要有个人错题集功能，所以就加上了。大家可以随意注册一下登录使用，也可以不登录，其他都没变。有几个哥们儿强烈想要MP3功能，决定让大家投个票，如果大部分人觉得需要后面我就加上吧。。</p>
             <button @click="closeNotification" class="notification-close">知道了</button>
         </div>
     </div>
@@ -12,16 +12,21 @@ import { ref, onMounted } from 'vue'
 
 const showNotification = ref(false)
 
+const emit = defineEmits(['closed'])
+
 onMounted(() => {
-    const hasShownNotification = localStorage.getItem('hasShownNotification')
+    const hasShownNotification = localStorage.getItem('hasShownNotification_v2')
     if (!hasShownNotification) {
         showNotification.value = true
+    } else {
+        emit('closed')
     }
 })
 
 function closeNotification() {
     showNotification.value = false
-    localStorage.setItem('hasShownNotification', 'true')
+    localStorage.setItem('hasShownNotification_v2', 'true')
+    emit('closed')
 }
 </script>
 

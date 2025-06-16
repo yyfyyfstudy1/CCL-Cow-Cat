@@ -16,7 +16,7 @@ async function loadExcel() {
     try {
         console.log('开始加载 Excel 文件...');
         console.log(S3_BASE_URL);
-        const res = await fetch(`${S3_BASE_URL}/excel/result.xlsx`);
+        const res = await fetch(`${S3_BASE_URL}/excel/output_filled.xlsx`);
         
         if (!res.ok) {
             throw new Error(`Failed to fetch Excel file: ${res.status} ${res.statusText}`);
@@ -36,7 +36,7 @@ async function loadExcel() {
         
         // 将 Excel 数据转换为数组，并指定列名
         const rows = XLSX.utils.sheet_to_json(sheet, {
-            header: ['qid', 'title', 'text', 'audio1', 'audio2', 'type', 'date', 'extraMention'],
+            header: ['qid', 'title', 'text', 'audio1', 'audio2', 'type', 'date', 'extraMention', 'isQuestion', 'id'],
             range: 1  // 跳过标题行
         });
 

@@ -1,6 +1,5 @@
 <template>
     <div class="container">
-        <NotificationBanner />
         <h1 style="font-size:24px;font-weight:700;margin-bottom:24px">
             对话列表
         </h1>
@@ -38,7 +37,21 @@
                                 <span v-if="q.date" class="tag date-tag">{{ q.date }}</span>
                             </div>
                         </div>
-                        <span class="qid">题号: {{ q.qid }}</span>
+                        <div class="right-content">
+                            <template v-if="isLoggedIn">
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar"
+                                        :style="{
+                                            width: getCompletionPercentage(q.qid) + '% ',
+                                            backgroundColor: getCompletionPercentage(q.qid) === 100 ? '#4CAF50' : '#ffc107'
+                                        }">
+                                    </div>
+                                </div>
+                                <span class="completion-text">{{ getCompletionPercentage(q.qid) }}%</span>
+                            </template>
+                            <span v-else class="login-prompt">登录查看完成度</span>
+                            <span class="qid">题号: {{ q.qid }}</span>
+                        </div>
                     </div>
                 </li>
             </ul>
@@ -58,11 +71,12 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useData } from '../services/useData.js';
 import FilterPanel from './FilterPanel.vue';
-import NotificationBanner from './NotificationBanner.vue'
+import { getAllLearned } from '../services/learned.js'
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
 const router = useRouter();
 const cur = ref(1);
@@ -81,10 +95,16 @@ watch(filters, () => {
 
 const { loadExcel, data } = useData();
 
+const learnedDialogs = ref({});
+const isLoggedIn = ref(false);
+
 async function retryLoad() {
     error.value = null;
     try {
         await loadExcel();
+        if (isLoggedIn.value) {
+            await loadLearnedDialogs();
+        }
     } catch (err) {
         error.value = err.message;
     }
@@ -92,6 +112,37 @@ async function retryLoad() {
 
 // 初始加载
 retryLoad();
+
+onMounted(() => {
+    const auth = getAuth();
+    onAuthStateChanged(auth, (user) => {
+        isLoggedIn.value = !!user;
+        if (user) {
+            loadLearnedDialogs();
+        } else {
+            learnedDialogs.value = {};
+        }
+    });
+});
+
+async function loadLearnedDialogs() {
+    try {
+        learnedDialogs.value = await getAllLearned();
+    } catch (e) {
+        console.error("加载已学对话失败:", e);
+        learnedDialogs.value = {};
+    }
+}
+
+// 计算每个题目的完成度
+function getCompletionPercentage(qid) {
+    const qidLearned = learnedDialogs.value[qid];
+    if (!qidLearned) return 0;
+    
+    const learnedCount = Object.keys(qidLearned).length;
+    const totalDialogs = 14; // 假设每道题有14个对话
+    return Math.min(100, Math.floor((learnedCount / totalDialogs) * 100));
+}
 
 // 获取所有可用的类型
 const availableTypes = computed(() => {
@@ -309,6 +360,41 @@ function toDetail(qid) {
 .qid {
     color: #666;
     font-size: 14px;
+}
+
+.right-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.progress-bar-container {
+    width: 80px; /* 进度条容器宽度 */
+    height: 8px; /* 进度条容器高度 */
+    background-color: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease-in-out, background-color 0.3s ease-in-out;
+}
+
+.completion-text {
+    font-size: 14px;
+    color: #333;
+    font-weight: 500;
+    min-width: 40px;
+}
+
+.login-prompt {
+    font-size: 12px;
+    color: #999;
+    text-align: center;
+    width: 120px;
+    flex-shrink: 0;
 }
 
 .pagination {

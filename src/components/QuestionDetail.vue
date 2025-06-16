@@ -1,6 +1,5 @@
 <template>
     <div class="container">
-        <NotificationBanner />
         <a class="back" @click="$router.back()">← 返回</a>
 
         <div v-if="error" class="error">
@@ -15,29 +14,56 @@
         </div>
 
         <div v-else>
-            <div class="title-section">
-                <h2 class="title">{{ title }}</h2>
-                <div class="tags">
-                    <span v-if="type" class="tag type-tag">{{ type }}</span>
-                    <span v-if="date" class="tag date-tag">{{ date }}</span>
+            <div v-if="!isFavoritesMode">
+                <div class="title-section">
+                    <h2 class="title">{{ pageTitle }}</h2>
+                    <div class="tags">
+                        <span v-if="pageType" class="tag type-tag">{{ pageType }}</span>
+                        <span v-if="pageDate" class="tag date-tag">{{ pageDate }}</span>
+                    </div>
+                </div>
+                <p class="qid">题号：{{ pageQid }}</p>
+                <!-- 额外提示信息 -->
+                <div v-if="pageExtraMention" class="extra-mention">
+                    {{ pageExtraMention }}
+                </div>
+                <!-- 简介音频 -->
+                <div v-if="pageIntro" class="section">
+                    <h3>简介</h3>
+                    <audio :src="audioSrc(pageIntro)" controls class="audio" />
                 </div>
             </div>
-            <p class="qid">题号：{{ qid }}</p>
-
-            <!-- 额外提示信息 -->
-            <div v-if="extraMention" class="extra-mention">
-                {{ extraMention }}
-            </div>
-
-            <!-- 简介音频 -->
-            <div v-if="intro" class="section">
-                <h3>简介</h3>
-                <audio :src="audioSrc(intro)" controls class="audio" />
-            </div>
-
             <!-- 对话内容 -->
             <div v-for="(dialog, idx) in dialogs" :key="idx" class="section">
-                <h3>对话 {{ idx + 1 }}</h3>
+                <div class="dialog-header-row">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <h3 style="margin:0;">对话 {{ idx + 1 }}</h3>
+                        <template v-if="dialog.original.isQuestion == 1">
+                            <button v-if="!isFavoritesMode"
+                                class="favorite-btn"
+                                :title="favoriteIds.includes(String(dialog.original.id)) ? '取消收藏' : '收藏对话'"
+                                @click="toggleFavorite(dialog.original.id)"
+                                style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;"
+                            >
+                                <span class="material-icons"
+                                    :style="{color: favoriteIds.includes(String(dialog.original.id)) ? '#e74c3c' : '#bbb'}">
+                                    {{ favoriteIds.includes(String(dialog.original.id)) ? 'favorite' : 'favorite_border' }}
+                                </span>
+                            </button>
+                            <span v-else class="material-icons" style="color:#e74c3c;vertical-align:middle;margin-left:4px;">favorite</span>
+                        </template>
+                    </div>
+
+                    <!-- 收藏模式下的来源链接，靠右显示 -->
+                    <div v-if="isFavoritesMode && dialog.original.associatedQid" class="dialog-source-right">
+                        来源：
+                        <router-link :to="{ name: 'dialog', params: { qid: dialog.original.associatedQid } }" class="source-link">
+                          {{ dialog.original.associatedQid }}
+                          {{ dialog.original.associatedTitle }}
+                            
+                        </router-link>
+                    </div>
+                </div>
 
                 <!-- 原文部分 -->
                 <div class="dialog-part">
@@ -144,12 +170,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useData } from '../services/useData.js'
 import { checkTranslation, transcribeAudio } from '../services/openai.js'
 import { googleDriveService } from '../services/googleDrive.js'
-import NotificationBanner from './NotificationBanner.vue'
+import { addFavorite, removeFavorite, getAllFavorites } from '../services/favorites.js'
+import { markAsLearned } from '../services/learned.js'
 
 const route = useRoute()
 const qid = route.params.qid
@@ -179,34 +206,26 @@ const showNotification = ref(false)
 const { loadExcel, data } = useData()
 const S3_BASE_URL = "https://cclcowcatresource.s3.ap-southeast-2.amazonaws.com";
 
+// 收藏相关
+const favoriteIds = ref([])
+
+// 页面数据（改为 ref）
+const pageTitle = ref('Untitled')
+const pageIntro = ref(null)
+const pageType  = ref('')
+const pageDate  = ref('')
+const pageExtraMention = ref('')
+const pageQid = ref(null) // 新增：用于存储当前显示的题号
+const dialogs = ref([]) // 依然是 ref
+
+const isFavoritesMode = computed(() => route.name === 'myFavorites' || route.params.mode === 'favorites')
+
 async function retryLoad() {
   error.value = null
   try { await loadExcel() }
   catch (e) { error.value = e.message }
 }
 retryLoad()
-
-// 从 data.byQid 中读取当前 qid 的行
-const rows = computed(() => data.byQid[qid] || [])
-const title = computed(() => rows.value[0]?.title || 'Untitled')
-const intro = computed(() => rows.value[0]?.audio1 || null)
-const type  = computed(() => rows.value[0]?.type  || '')
-const date  = computed(() => rows.value[0]?.date  || '')
-const extraMention = computed(() => rows.value[0]?.extraMention || '')
-// 每两行构造一条对话：原文 + 译文
-const dialogs = computed(() => {
-  const arr = []
-  for (let i = 1; i < rows.value.length; i += 2) {
-    const o = rows.value[i], t = rows.value[i + 1]
-    if (o && t) {
-      arr.push({
-        original:    { text: o.text, audio: o.audio1 },
-        translation: { text: t.text, audio: t.audio1 }
-      })
-    }
-  }
-  return arr
-})
 
 function getDialogKey(idx, type) {
   return `${idx}-${type}`
@@ -222,10 +241,85 @@ function audioSrc(rel) {
   return rel ? `${S3_BASE_URL}/audio${rel}` : '';
 }
 
+// 统一的数据加载函数
+async function loadPageData() {
+  error.value = null
+  try {
+    await loadExcel() // 确保 Excel 数据已加载
+
+    if (isFavoritesMode.value) {
+      // 收藏模式：加载所有收藏id，构造dialogs
+      const ids = await getAllFavorites()
+      dialogs.value = ids.map(id => {
+        const originalRow = data.rows.find(r => String(r.id) === String(id))
+        const translationRow = data.rows.find(r => String(r.id) === String(Number(id) + 1))
+
+        return {
+          original: {
+            text: originalRow?.text || '',
+            audio: originalRow?.audio1 || '',
+            isQuestion: 1, // 收藏的对话都视为问题类型
+            id: id,
+            associatedQid: originalRow?.qid || null,
+            associatedTitle: originalRow?.title || '未知题目'
+          },
+          translation: {
+            text: translationRow?.text || '',
+            audio: translationRow?.audio1 || ''
+          }
+        }
+      })
+      pageTitle.value = '我的收藏对话' // 收藏页面标题
+      // 其他收藏页面特有的标题/信息可以设置，这里暂不设置 intro, type, date, extraMention
+    } else {
+      // 普通模式：根据 qid 加载数据
+      const currentQid = route.params.qid
+      pageQid.value = currentQid // 更新 pageQid
+      const rowsForQid = data.byQid[currentQid] || []
+
+      if (rowsForQid.length === 0) {
+        throw new Error(`找不到题号为 ${currentQid} 的对话。`)
+      }
+
+      pageTitle.value = rowsForQid[0]?.title || 'Untitled'
+      pageIntro.value = rowsForQid[0]?.audio1 || null
+      pageType.value  = rowsForQid[0]?.type  || ''
+      pageDate.value  = rowsForQid[0]?.date  || ''
+      pageExtraMention.value = rowsForQid[0]?.extraMention || ''
+
+      // 构造对话列表
+      const arr = []
+      for (let i = 1; i < rowsForQid.length; i += 2) {
+        const o = rowsForQid[i], t = rowsForQid[i + 1]
+        if (o && t) {
+          arr.push({
+            original:    { text: o.text, audio: o.audio1, isQuestion: o.isQuestion, id: o.id },
+            translation: { text: t.text, audio: t.audio1 }
+          })
+        }
+      }
+      dialogs.value = arr
+    }
+
+    // 无论哪种模式，都加载收藏状态
+    await loadFavorites()
+
+  } catch (e) {
+    console.error('加载页面数据失败:', e)
+    error.value = e.message
+  }
+}
+
+// 监听路由变化，重新加载数据
+watch(() => route.fullPath, (newPath, oldPath) => {
+  if (newPath !== oldPath) {
+    loadPageData()
+  }
+}, { immediate: true })
+
+// 首次加载（由 watch immediate 触发，但确保其他初始化）
 onMounted(() => {
   chimeAudio.value = new Audio('/chime.mp4')
-
-  // 检查是否显示过提示
   const hasShownNotification = localStorage.getItem('hasShownNotification')
   if (!hasShownNotification) {
     showNotification.value = true
@@ -401,6 +495,12 @@ async function startRecording(dialogId) {
       // AI 翻译评估
       aiCheckResult = await checkTranslation(originalText, trimmedText)
 
+      // 记录已学对话
+      const dialog = dialogs.value[dialogId]
+      if (dialog?.original?.id) {
+        await markAsLearned(route.params.qid, String(dialog.original.id))
+      }
+
       // 生成文件名（使用当前时间，精确到分钟）
       const now = new Date()
       const filename = now.toISOString().replace(/[:.]/g, '-').split('.')[0] + '.wav'
@@ -492,6 +592,26 @@ function cancelRecording() {
 function closeNotification() {
     showNotification.value = false
     localStorage.setItem('hasShownNotification', 'true')
+}
+
+async function loadFavorites() {
+  try {
+    favoriteIds.value = (await getAllFavorites()).map(String)
+    console.log('收藏id:', favoriteIds.value)
+  } catch (e) {
+    console.error('加载收藏失败:', e)
+    favoriteIds.value = []
+  }
+}
+
+async function toggleFavorite(id) {
+  const strId = String(id)
+  if (favoriteIds.value.includes(strId)) {
+    await removeFavorite(strId)
+  } else {
+    await addFavorite(strId)
+  }
+  await loadFavorites()
 }
 </script>
 
@@ -1008,5 +1128,28 @@ h3 {
 
 .notification-close:hover {
     background: #1565c0;
+}
+
+.dialog-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* 使得内部元素左右分散 */
+    margin-bottom: 16px; /* 标题行和下面内容之间留空 */
+}
+
+.dialog-source-right {
+    font-size: 14px;
+    color: #666;
+    flex-shrink: 0;
+}
+
+.source-link {
+    color: #007bff;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.source-link:hover {
+    color: #0056b3;
 }
 </style>
