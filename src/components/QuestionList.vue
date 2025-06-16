@@ -140,7 +140,10 @@ function getCompletionPercentage(qid) {
     if (!qidLearned) return 0;
     
     const learnedCount = Object.keys(qidLearned).length;
-    const totalDialogs = 14; // 假设每道题有14个对话
+    // 计算实际对话数量：(总行数 - 1) / 2
+    // -1 是因为第一行是题目信息
+    // /2 是因为每两行组成一个对话（原文和译文）
+    const totalDialogs = Math.floor((data.byQid[qid]?.length - 1) / 2);
     return Math.min(100, Math.floor((learnedCount / totalDialogs) * 100));
 }
 
