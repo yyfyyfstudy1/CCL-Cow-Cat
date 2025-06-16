@@ -2,7 +2,7 @@
     <div v-if="showModal" class="mp3-poll-modal-overlay">
         <div class="mp3-poll-modal-content">
             <h3>MP3 功能投票</h3>
-            <p class="poll-description">你认为是否有必要在网站中增加MP3下载功能？加上MP3功能会方便你的备考吗？</p>
+            <p class="poll-description">你认为是否有必要在网站中增加MP3随身听功能吗？加上MP3功能会方便你的备考吗？</p>
 
             <div v-if="!hasVoted" class="vote-options">
                 <button class="vote-btn primary" @click="vote('need_mp3')">需要MP3</button>
@@ -230,4 +230,4 @@ function closeModal() {
 .close-btn:hover {
     background-color: #5a6268;
 }
-</style> 
+</style>
