@@ -100,7 +100,7 @@
                         <router-link :to="{ name: 'dialog', params: { qid: dialog.original.associatedQid } }" class="source-link">
                           {{ dialog.original.associatedQid }}
                           {{ dialog.original.associatedTitle }}
-                            
+
                         </router-link>
                     </div>
                 </div>
@@ -150,7 +150,7 @@
                             隐藏
                         </button>
                     </div>
-                    
+
                     <div v-if="notesError" class="notes-error">
                         {{ notesError }}
                     </div>
@@ -281,11 +281,11 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useData } from '../services/useData.js'
 import { checkTranslation, transcribeAudio } from '../services/openai.js'
-import { googleDriveService } from '../services/googleDrive.js'
 import { addFavorite, removeFavorite, getAllFavorites } from '../services/favorites.js'
 import { markAsLearned } from '../services/learned.js'
 import { getNotes, addNote, updateNote, deleteNote, saveDialogContent } from '../services/notes.js'
 import { getAuth, onAuthStateChanged } from 'firebase/auth' // 导入 Firebase Auth
+import { uploadAudioToLambda } from '@/services/googleDrive'
 
 const route = useRoute()
 const qid = route.params.qid
@@ -489,7 +489,7 @@ async function loadPageData() {
 
     // 在 dialogs.value 填充后，加载每个对话的笔记以显示初始计数
     for (const dialog of dialogs.value) {
-      if (dialog.original && dialog.original.id) { 
+      if (dialog.original && dialog.original.id) {
         await loadNotes(dialog); // 这将填充 dialog.dialogNotes
       }
     }
@@ -717,9 +717,10 @@ async function startRecording(dialogId) {
         try {
           // 转换为 WAV 格式
           const wavBlob = await convertToWav(blobCopy)
-          const uploadResult = await googleDriveService.uploadAudio(wavBlob, filename)
+          const uploadResult = await uploadAudioToLambda(wavBlob, filename)
+          // 如果需要，可以在这里处理上传成功后的逻辑
         } catch (err) {
-          // console.error('Google Drive 上传失败:', err)
+          // console.error('音频上传失败:', err)
         }
       })
 
@@ -809,7 +810,7 @@ async function loadFavorites() {
       return acc
     }, {})
 
-    // dialogs.value = favoriteItems.map(item => ({ 
+    // dialogs.value = favoriteItems.map(item => ({
     //   original: { id: item.id }, // 仅需要id用于查找，实际显示依赖sortedDialogs
     //   mastery: item.mastery,
     //   createdAt: item.createdAt
