@@ -33,12 +33,27 @@
                     <audio :src="audioSrc(pageIntro)" controls class="audio" />
                 </div>
             </div>
+            <!-- 新增：收藏模式下的页面头部和排序按钮 -->
+            <div v-else class="favorites-header">
+                <h2 class="title">{{ pageTitle }}</h2>
+                <div class="sort-controls">
+                    <button class="sort-btn" @click="toggleSortMode">
+                        排序：<span>{{ currentSortMode === 'createdAt' ? '添加时间' : '熟练度' }}</span>
+                    </button>
+                    <button class="sort-order-btn" @click="toggleSortOrder">
+                        <span class="material-icons sort-icon">
+                            {{ sortOrder === 'desc' ? 'arrow_downward' : 'arrow_upward' }}
+                        </span>
+                    </button>
+                </div>
+            </div>
+
             <!-- 对话内容 -->
-            <div v-for="(dialog, idx) in dialogs" :key="idx" class="section">
+            <div v-for="(dialog, idx) in sortedDialogs" :key="dialog.original.id" class="section">
                 <div class="dialog-header-row">
                     <div style="display:flex;align-items:center;gap:8px;">
                         <h3 style="margin:0;">对话 {{ idx + 1 }}</h3>
-                        <template v-if="dialog.original.isQuestion == 1">
+                        <template v-if="dialog.original.isQuestion == 1 && isLoggedIn">
                             <button v-if="!isFavoritesMode"
                                 class="favorite-btn"
                                 :title="favoriteIds.includes(String(dialog.original.id)) ? '取消收藏' : '收藏对话'"
@@ -51,6 +66,31 @@
                                 </span>
                             </button>
                             <span v-else class="material-icons" style="color:#e74c3c;vertical-align:middle;margin-left:4px;">favorite</span>
+                            <!-- 新增：收藏模式下的熟练度星级显示 -->
+                            <div v-if="isFavoritesMode"
+                                class="star-rating"
+                                @mouseenter="showMasteryTooltip = true"
+                                @mouseleave="showMasteryTooltip = false"
+                            >
+                                <span v-for="n in 5" :key="n"
+                                    class="material-icons star-icon"
+                                    :class="{ 'filled': n <= dialog.mastery }"
+                                    @click="updateMastery(dialog.original.id, n)">
+                                    {{ n <= dialog.mastery ? 'star' : 'star_border' }}
+                                </span>
+                                <div v-if="showMasteryTooltip" class="mastery-tooltip">
+                                    根据你现在的熟练度点亮星星
+                                </div>
+                            </div>
+                            <!-- 新增：笔记图标 -->
+                            <button v-if="dialog.original.isQuestion == 1"
+                                class="notes-icon-btn"
+                                :title="dialog.showNotes ? '隐藏笔记' : '显示笔记'"
+                                @click="toggleNotesSection(dialog)"
+                            >
+                                <span class="material-icons">notes</span>
+                                <span class="notes-text" v-if="dialog.dialogNotes.length > 0">{{ dialog.dialogNotes.length }} 条笔记</span>
+                            </button>
                         </template>
                     </div>
 
@@ -100,6 +140,73 @@
                         </p>
                     </transition>
                     <audio :src="audioSrc(dialog.translation.audio)" controls class="audio" />
+                </div>
+
+                <!-- 新增：笔记部分 -->
+                <div v-if="dialog.showNotes" class="notes-section">
+                    <div class="notes-header">
+                        <h4>我的笔记 ({{ dialog.dialogNotes.length }})</h4>
+                        <button class="toggle-btn" @click="toggleNotesSection(dialog)">
+                            隐藏
+                        </button>
+                    </div>
+                    
+                    <div v-if="notesError" class="notes-error">
+                        {{ notesError }}
+                    </div>
+
+                    <!-- 添加新笔记 -->
+                    <div class="add-note-container">
+                        <textarea
+                            v-model="newNoteText[dialog.original.id]"
+                            placeholder="记录你的笔记..."
+                            class="note-textarea"
+                            rows="3"
+                        ></textarea>
+                        <button
+                            class="add-note-btn"
+                            @click="handleAddNote(dialog)"
+                            :disabled="!newNoteText[dialog.original.id] || newNoteText[dialog.original.id].trim().length === 0"
+                        >
+                            <span class="material-icons">send</span>
+                        </button>
+                    </div>
+
+                    <!-- 笔记列表 -->
+                    <div v-if="dialog.dialogNotes.length > 0" class="notes-list">
+                        <div v-for="note in dialog.dialogNotes" :key="note.id" class="note-item">
+                            <template v-if="editingNoteId === note.id">
+                                <textarea
+                                    v-model="editingNoteText"
+                                    class="note-textarea edit-mode"
+                                    rows="3"
+                                ></textarea>
+                                <div class="note-actions-edit-mode">
+                                    <button class="action-btn save-btn" @click="handleSaveNote(dialog, note.id)" title="保存">
+                                        <span class="material-icons">check</span>
+                                    </button>
+                                    <button class="action-btn cancel-btn" @click="handleCancelEdit" title="取消">
+                                        <span class="material-icons">close</span>
+                                    </button>
+                                </div>
+                            </template>
+                            <template v-else>
+                                <p class="note-text">{{ note.text }}</p>
+                                <span class="note-timestamp">{{ new Date(note.createdAt).toLocaleString() }}</span>
+                                <div class="note-actions">
+                                    <button class="action-btn" @click="handleEditNote(note)" title="编辑">
+                                        <span class="material-icons">edit</span>
+                                    </button>
+                                    <button class="action-btn" @click="handleDeleteNote(dialog, note.id)" title="删除">
+                                        <span class="material-icons">delete</span>
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                    <div v-else class="empty-notes">
+                        <p>还没有笔记，快来记录吧！</p>
+                    </div>
                 </div>
 
                 <!-- 录音部分 -->
@@ -177,6 +284,8 @@ import { checkTranslation, transcribeAudio } from '../services/openai.js'
 import { googleDriveService } from '../services/googleDrive.js'
 import { addFavorite, removeFavorite, getAllFavorites } from '../services/favorites.js'
 import { markAsLearned } from '../services/learned.js'
+import { getNotes, addNote, updateNote, deleteNote, saveDialogContent } from '../services/notes.js'
+import { getAuth, onAuthStateChanged } from 'firebase/auth' // 导入 Firebase Auth
 
 const route = useRoute()
 const qid = route.params.qid
@@ -187,6 +296,23 @@ const isRecording = ref(false)
 const mediaRecorder = ref(null)
 const audioChunks = ref([])
 const chimeAudio = ref(null)
+
+// 新增：登录状态
+const isLoggedIn = ref(false)
+
+// 新增：鼠标悬停提示状态
+const showMasteryTooltip = ref(false)
+
+// 新增：排序模式状态
+const currentSortMode = ref('createdAt') // 默认按添加时间排序
+// 新增：排序方向状态
+const sortOrder = ref('desc') // 默认降序
+
+// 新增：笔记相关状态
+const newNoteText = ref({}) // 存储每个对话的新笔记内容
+const editingNoteId = ref(null) // 当前正在编辑的笔记ID
+const editingNoteText = ref('') // 当前正在编辑的笔记内容
+const notesError = ref(null); // 笔记操作的错误信息
 
 // 存储所有录音及其转录
 // recordingsList: { [dialogIdx]: [ { url, text, timestamp, aiCheck } ] }
@@ -208,6 +334,7 @@ const S3_BASE_URL = "https://cclcowcatresource.s3.ap-southeast-2.amazonaws.com";
 
 // 收藏相关
 const favoriteIds = ref([])
+const favoriteMasteries = ref({}); // 新增：存储收藏对话的熟练度
 
 // 页面数据（改为 ref）
 const pageTitle = ref('Untitled')
@@ -219,6 +346,34 @@ const pageQid = ref(null) // 新增：用于存储当前显示的题号
 const dialogs = ref([]) // 依然是 ref
 
 const isFavoritesMode = computed(() => route.name === 'myFavorites' || route.params.mode === 'favorites')
+
+// 新增：根据排序模式计算排序后的对话列表
+const sortedDialogs = computed(() => {
+  if (!isFavoritesMode.value || !dialogs.value.length) {
+    return dialogs.value
+  }
+
+  // 创建一个副本以避免直接修改原始数组
+  const sorted = [...dialogs.value]
+
+  if (currentSortMode.value === 'createdAt') {
+    // 按添加时间排序
+    return sorted.sort((a, b) => {
+      const valA = a.createdAt || 0
+      const valB = b.createdAt || 0
+      return sortOrder.value === 'desc' ? valB - valA : valA - valB
+    })
+  } else if (currentSortMode.value === 'mastery') {
+    // 按熟练度排序
+    return sorted.sort((a, b) => {
+      const valA = a.mastery || 0
+      const valB = b.mastery || 0
+      return sortOrder.value === 'desc' ? valB - valA : valA - valB
+    })
+  } else {
+    return dialogs.value
+  }
+})
 
 async function retryLoad() {
   error.value = null
@@ -247,12 +402,28 @@ async function loadPageData() {
   try {
     await loadExcel() // 确保 Excel 数据已加载
 
+    // 如果未登录且处于收藏模式，则不加载收藏
+    if (!isLoggedIn.value && isFavoritesMode.value) {
+        pageTitle.value = '我的收藏对话 (请登录)';
+        dialogs.value = []; // 清空对话列表
+        return; // 提前退出
+    }
+
     if (isFavoritesMode.value) {
-      // 收藏模式：加载所有收藏id，构造dialogs
-      const ids = await getAllFavorites()
-      dialogs.value = ids.map(id => {
-        const originalRow = data.rows.find(r => String(r.id) === String(id))
+      // 收藏模式：加载所有收藏id及熟练度，构造dialogs
+      const favoriteItems = await getAllFavorites()
+      favoriteIds.value = favoriteItems.map(item => String(item.id))
+      favoriteMasteries.value = favoriteItems.reduce((acc, item) => {
+        acc[String(item.id)] = item.mastery
+        return acc
+      }, {})
+
+      dialogs.value = favoriteItems.map(item => {
+        const id = String(item.id)
+        const originalRow = data.rows.find(r => String(r.id) === id)
         const translationRow = data.rows.find(r => String(r.id) === String(Number(id) + 1))
+
+        console.log(`Loading favorite dialog ${id}, mastery: ${item.mastery}`)
 
         return {
           original: {
@@ -266,7 +437,14 @@ async function loadPageData() {
           translation: {
             text: translationRow?.text || '',
             audio: translationRow?.audio1 || ''
-          }
+          },
+          mastery: item.mastery, // 将熟练度传递给对话数据
+          createdAt: item.createdAt, // 将创建时间传递给对话数据
+          showNotes: false, // 默认不显示笔记部分
+          dialogNotes: [], // 初始化空笔记列表
+          qid: originalRow?.qid || null, // 将关联的qid保存到每个对话对象
+          title: originalRow?.title || '未知题目', // 将关联的title保存到每个对话对象
+          type: originalRow?.type || '' // 将关联的type保存到每个对话对象
         }
       })
       pageTitle.value = '我的收藏对话' // 收藏页面标题
@@ -294,7 +472,12 @@ async function loadPageData() {
         if (o && t) {
           arr.push({
             original:    { text: o.text, audio: o.audio1, isQuestion: o.isQuestion, id: o.id },
-            translation: { text: t.text, audio: t.audio1 }
+            translation: { text: t.text, audio: t.audio1 },
+            showNotes: false, // 默认不显示笔记部分
+            dialogNotes: [], // 初始化空笔记列表
+            qid: currentQid, // 将当前页面的qid保存到每个对话对象
+            title: pageTitle.value, // 将当前页面的title保存到每个对话对象
+            type: pageType.value // 将当前页面的type保存到每个对话对象
           })
         }
       }
@@ -303,6 +486,13 @@ async function loadPageData() {
 
     // 无论哪种模式，都加载收藏状态
     await loadFavorites()
+
+    // 在 dialogs.value 填充后，加载每个对话的笔记以显示初始计数
+    for (const dialog of dialogs.value) {
+      if (dialog.original && dialog.original.id) { 
+        await loadNotes(dialog); // 这将填充 dialog.dialogNotes
+      }
+    }
 
   } catch (e) {
     console.error('加载页面数据失败:', e)
@@ -319,10 +509,26 @@ watch(() => route.fullPath, (newPath, oldPath) => {
 
 // 首次加载（由 watch immediate 触发，但确保其他初始化）
 onMounted(() => {
+  const auth = getAuth()
+  onAuthStateChanged(auth, (user) => {
+    isLoggedIn.value = !!user
+    // 登录状态变化时重新加载页面数据，以更新收藏/笔记可见性
+    loadPageData()
+  })
+
   chimeAudio.value = new Audio('/chime.mp4')
   const hasShownNotification = localStorage.getItem('hasShownNotification')
   if (!hasShownNotification) {
     showNotification.value = true
+  }
+  // 笔记加载现在由 toggleNotesSection 触发，或者在 /dialog/:qid 模式下在 loadPageData 触发
+  // 如果是 /dialog/:qid 模式，并且不是收藏模式，确保笔记加载
+  if (!isFavoritesMode.value && dialogs.value.length > 0) {
+    // For /dialog/:qid, we assume the first dialog in the `dialogs` array is the main one for notes
+    // This will load notes for the first dialog part of the current QID
+    // However, if notes are per 'dialog' (original/translation pair), then each would have its own.
+    // Since the notes icon will be per dialog part, the toggleNotesSection will handle loading.
+    // So, no explicit loading here is needed for non-favorites mode either.
   }
 })
 onUnmounted(() => {
@@ -596,11 +802,25 @@ function closeNotification() {
 
 async function loadFavorites() {
   try {
-    favoriteIds.value = (await getAllFavorites()).map(String)
-    console.log('收藏id:', favoriteIds.value)
+    const favoriteItems = await getAllFavorites()
+    favoriteIds.value = favoriteItems.map(item => String(item.id))
+    favoriteMasteries.value = favoriteItems.reduce((acc, item) => {
+      acc[String(item.id)] = item.mastery
+      return acc
+    }, {})
+
+    // dialogs.value = favoriteItems.map(item => ({ 
+    //   original: { id: item.id }, // 仅需要id用于查找，实际显示依赖sortedDialogs
+    //   mastery: item.mastery,
+    //   createdAt: item.createdAt
+    // }));
+
+    console.log('收藏id及熟练度:', favoriteMasteries.value)
   } catch (e) {
     console.error('加载收藏失败:', e)
     favoriteIds.value = []
+    favoriteMasteries.value = {}
+    // dialogs.value = [] // 加载失败时清空对话列表 - 这行也不再需要，因为dialogs由loadPageData负责
   }
 }
 
@@ -609,9 +829,127 @@ async function toggleFavorite(id) {
   if (favoriteIds.value.includes(strId)) {
     await removeFavorite(strId)
   } else {
-    await addFavorite(strId)
+    // 新增收藏时，默认熟练度为 0
+    await addFavorite(strId, 0)
   }
   await loadFavorites()
+}
+
+// 新增：更新熟练度函数
+async function updateMastery(dialogId, newMastery) {
+  const strId = String(dialogId)
+  try {
+    await addFavorite(strId, newMastery)
+    // 找到对应的对话并更新其熟练度，实现实时显示
+    const dialogToUpdate = dialogs.value.find(d => String(d.original.id) === strId)
+    if (dialogToUpdate) {
+      dialogToUpdate.mastery = newMastery
+      // 也可以更新 favoriteMasteries.value 以保持数据一致性
+      favoriteMasteries.value[strId] = newMastery
+    }
+    // 当熟练度更新时，确保 sortedDialogs 能够重新计算。
+    // 如果当前是按熟练度排序，强制更新 dialogs.value 以触发 computed 重新计算。
+    // 简单做法是重新赋值 dialogs.value，或者更新 dialogs.value 内部的元素。
+    // 因为我们已经直接修改了 dialogToUpdate.mastery，Vue 会自动响应。
+    console.log(`对话 ${strId} 的熟练度已更新为 ${newMastery}`)
+  } catch (e) {
+    console.error('更新熟练度失败:', e)
+  }
+}
+
+// 新增：切换排序模式
+function toggleSortMode() {
+  currentSortMode.value = currentSortMode.value === 'createdAt' ? 'mastery' : 'createdAt'
+  console.log(`排序模式已切换为: ${currentSortMode.value === 'createdAt' ? '添加时间' : '熟练度'}`)
+}
+
+// 新增：切换排序方向
+function toggleSortOrder() {
+  sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
+  console.log(`排序方向已切换为: ${sortOrder.value === 'desc' ? '降序' : '升序'}`)
+}
+
+// 新增：加载笔记函数
+async function loadNotes(dialog) {
+  notesError.value = null; // 清除之前的错误
+  if (!dialog || !dialog.original || !dialog.original.id) return; // 没有对话或ID则不加载笔记
+  try {
+    dialog.dialogNotes = await getNotes(dialog.original.id);
+    console.log(`对话 ${dialog.original.id} 的笔记已加载:`, dialog.dialogNotes);
+  } catch (e) {
+    console.error(`加载对话 ${dialog.original.id} 笔记失败:`, e);
+    notesError.value = e.message;
+  }
+}
+
+// 新增：添加笔记函数
+async function handleAddNote(dialog) {
+  const dialogId = dialog.original.id;
+  if (!newNoteText.value[dialogId] || !newNoteText.value[dialogId].trim()) return; // 笔记内容不能为空
+  notesError.value = null; // 清除之前的错误
+  try {
+    await addNote(dialogId, newNoteText.value[dialogId]);
+    await saveDialogContent(dialogId, dialog.original.text, dialog.translation.text, dialog.qid, dialog.title, dialog.type); // 将对话内容和元数据保存到对话文档
+    newNoteText.value[dialogId] = ''; // 清空输入框
+    await loadNotes(dialog); // 重新加载笔记
+  } catch (e) {
+    console.error(`添加笔记失败:`, e);
+    notesError.value = e.message;
+  }
+}
+
+// 新增：开始编辑笔记
+function handleEditNote(note) {
+  editingNoteId.value = note.id;
+  editingNoteText.value = note.text;
+}
+
+// 新增：保存编辑后的笔记
+async function handleSaveNote(dialog, noteId) {
+  const dialogId = dialog.original.id;
+  if (!editingNoteText.value.trim()) {
+    notesError.value = '笔记内容不能为空';
+    return; // 笔记内容不能为空
+  }
+  notesError.value = null; // 清除之前的错误
+  try {
+    await updateNote(dialogId, noteId, editingNoteText.value);
+    editingNoteId.value = null; // 清除编辑状态
+    editingNoteText.value = '';
+    await loadNotes(dialog); // 重新加载笔记
+  } catch (e) {
+    console.error(`更新笔记失败:`, e);
+    notesError.value = e.message;
+  }
+}
+
+// 新增：取消编辑笔记
+function handleCancelEdit() {
+  editingNoteId.value = null;
+  editingNoteText.value = '';
+}
+
+// 新增：删除笔记函数
+async function handleDeleteNote(dialog, noteId) {
+  const dialogId = dialog.original.id;
+  if (!confirm('确定删除这条笔记吗？')) return; // 确认删除
+  notesError.value = null; // 清除之前的错误
+  try {
+    await deleteNote(dialogId, noteId);
+    await loadNotes(dialog); // 重新加载笔记
+  } catch (e) {
+    console.error(`删除笔记失败:`, e);
+    notesError.value = e.message;
+  }
+}
+
+// 新增：切换笔记部分显示/隐藏，并按需加载笔记
+function toggleNotesSection(dialog) {
+  dialog.showNotes = !dialog.showNotes;
+  if (dialog.showNotes && dialog.dialogNotes.length === 0) {
+    // 只有当笔记部分显示且笔记列表为空时才加载
+    loadNotes(dialog);
+  }
 }
 </script>
 
@@ -1151,5 +1489,354 @@ h3 {
 
 .source-link:hover {
     color: #0056b3;
+}
+
+/* 新增：星级评分样式 */
+.star-rating {
+    position: relative; /* 确保tooltip可以相对于它定位 */
+    display: flex;
+    align-items: center;
+    margin-left: 8px;
+}
+
+.star-icon {
+    font-size: 20px;
+    color: #bbb;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.star-icon.filled {
+    color: #f39c12; /* 填充星的颜色 */
+}
+
+.star-icon:hover {
+    color: #f1c40f; /* 悬停颜色 */
+}
+
+/* 新增：熟练度提示框样式 */
+.mastery-tooltip {
+    position: absolute;
+    top: -35px; /* 根据需要调整位置 */
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #333;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 10;
+    opacity: 0.95;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.mastery-tooltip::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 100%; /* 指向下方 */
+    transform: translateX(-50%);
+    border-width: 5px;
+    border-style: solid;
+    border-color: #333 transparent transparent transparent;
+}
+
+/* 新增：收藏页面头部样式 */
+.favorites-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding: 10px 0;
+}
+
+.sort-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* 排序按钮和图标之间的间距 */
+}
+
+.sort-btn {
+    padding: 8px 16px;
+    background: #ffffff; /* 白色背景 */
+    color: #333; /* 黑色文字 */
+    border: 1px solid #ccc; /* 浅灰色边框 */
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+    display: flex; /* 使得内部的span可以在中间 */
+    align-items: center;
+}
+
+.sort-btn:hover {
+    background: #f0f0f0; /* 悬停时稍微变灰 */
+    border-color: #999;
+}
+
+.sort-order-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px; /* 固定宽度 */
+    height: 36px; /* 固定高度 */
+    background: #ffffff;
+    color: #333;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.sort-order-btn:hover {
+    background: #f0f0f0;
+    border-color: #999;
+}
+
+.sort-icon {
+    font-size: 20px;
+}
+
+/* 新增：笔记图标和笔记部分样式 */
+.notes-icon-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #666;
+    transition: color 0.2s;
+    margin-left: 8px;
+    position: relative; /* For note count badge */
+}
+
+.notes-icon-btn:hover {
+    color: #333;
+}
+
+.notes-icon-btn .material-icons {
+    font-size: 20px;
+}
+
+.notes-text {
+    font-size: 14px;
+    color: #666;
+}
+
+.notes-section {
+    margin-top: 24px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    border: 1px solid #eee;
+}
+
+.notes-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.notes-header h4 {
+    margin: 0;
+    font-size: 16px;
+    color: #333;
+}
+
+.add-note-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.note-textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    resize: vertical;
+    min-height: 60px;
+}
+
+.note-textarea.edit-mode {
+    border-color: #007bff;
+}
+
+.add-note-btn {
+    padding: 0;
+    background: transparent;
+    color: #28a745; /* 绿色 */
+    border: 1px solid #28a745;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+    align-self: flex-end; /* 靠右对齐 */
+    display: flex; /* 居中图标 */
+    align-items: center;
+    justify-content: center;
+}
+
+.add-note-btn:hover:not(:disabled) {
+    background: #e6ffe6; /* 绿色浅色背景 */
+    color: #218838;
+    border-color: #218838;
+}
+
+.add-note-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: transparent;
+    color: #999;
+    border-color: #999;
+}
+
+.notes-list {
+    border-top: 1px solid #eee;
+    padding-top: 20px;
+}
+
+.note-item {
+    background: white;
+    border: 1px solid #f0f0f0;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 15px;
+    position: relative;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.note-item:last-child {
+    margin-bottom: 0;
+}
+
+.note-text {
+    margin: 0 0 10px 0;
+    line-height: 1.6;
+    color: #333;
+    white-space: pre-wrap; /* Preserve line breaks */
+}
+
+.note-timestamp {
+    font-size: 12px;
+    color: #999;
+}
+
+.note-actions {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    gap: 5px;
+}
+
+.action-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #666;
+    transition: color 0.2s;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+}
+
+.action-btn:hover {
+    color: #007bff;
+    background-color: #f0f0f0;
+}
+
+.action-btn .material-icons {
+    font-size: 18px;
+}
+
+.save-btn {
+    background-color: transparent;
+    color: #28a745; /* 绿色 */
+    border: 1px solid #28a745;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+}
+
+.save-btn:hover {
+    background-color: #e6ffe6; /* 绿色浅色背景 */
+    color: #218838;
+    border-color: #218838;
+}
+
+.cancel-btn {
+    background-color: transparent;
+    color: #dc3545; /* 红色 */
+    border: 1px solid #dc3545;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+}
+
+.cancel-btn:hover {
+    background-color: #ffe6e6; /* 红色浅色背景 */
+    color: #c82333;
+    border-color: #c82333;
+}
+
+.empty-notes {
+    text-align: center;
+    padding: 20px;
+    color: #999;
+    background: #f0f0f0;
+    border-radius: 4px;
+}
+
+.notes-error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 15px;
+    font-size: 14px;
+}
+
+/* 新增：编辑模式下的笔记操作按钮容器样式 */
+.note-actions-edit-mode {
+    display: flex;
+    justify-content: flex-end; /* 靠右对齐 */
+    gap: 10px;
+    margin-top: 10px; /* 与文本框的间距 */
+}
+
+.action-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #666;
+    transition: color 0.2s;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+}
+
+.action-btn:hover {
+    color: #007bff;
+    background-color: #f0f0f0;
+}
+
+.action-btn .material-icons {
+    font-size: 18px;
 }
 </style>

@@ -43,6 +43,22 @@
                     </div>
                 </div>
             </div>
+            <!-- 对话笔记 -->
+            <div class="stat-card">
+                <div class="stat-header">
+                    <span class="material-icons">note</span>
+                    <h3>对话笔记</h3>
+                </div>
+                <div class="stat-content">
+                    <div v-if="notesCount === 0" class="empty-state">
+                        <span class="material-icons">note</span>
+                        <p>暂无对话笔记</p>
+                    </div>
+                    <div v-else class="stats-display">
+                        <p class="stat-value">{{ notesCount }}</p>
+                    </div>
+                </div>
+            </div>
             
             <!-- 已听对话 -->
             <div class="stat-card">
@@ -52,8 +68,8 @@
                 </div>
                 <div class="stat-content">
                     <div class="empty-state">
-                        <!-- <span class="material-icons">headphones</span> -->
-                        <!-- <p>暂无已听对话</p> -->
+                        <span class="material-icons">headphones</span>
+                        <p>暂无已听对话</p>
                     </div>
                 </div>
                 <div class="overlay"><span class="overlay-text">功能未上线</span></div>
@@ -61,20 +77,7 @@
 
        
 
-            <!-- 对话笔记 -->
-            <div class="stat-card">
-                <div class="stat-header">
-                    <span class="material-icons">note</span>
-                    <h3>对话笔记</h3>
-                </div>
-                <div class="stat-content">
-                    <div class="empty-state">
-                        <!-- <span class="material-icons">note</span> -->
-                        <!-- <p>暂无对话笔记</p> -->
-                    </div>
-                </div>
-                <div class="overlay"><span class="overlay-text">功能未上线</span></div>
-            </div>
+            
         </div>
     </div>
 </template>
@@ -85,10 +88,13 @@ import { getAuth } from 'firebase/auth';
 import { getAllFavorites } from '../services/favorites';
 import { getAllLearned } from '../services/learned.js';
 import { useRouter } from 'vue-router';
+import { db } from '../services/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 const userEmail = ref('');
 const favoriteIds = ref([]);
 const learnedDialogCount = ref(0);
+const notesCount = ref(0);
 const router = useRouter();
 
 onMounted(() => {
@@ -119,6 +125,29 @@ onMounted(async () => {
     } catch (e) {
         console.error("加载已学对话失败:", e);
         learnedDialogCount.value = 0;
+    }
+});
+
+onMounted(async () => {
+    const auth = getAuth();
+    const user = auth.currentUser;
+
+    if (user) {
+        try {
+            let totalNotes = 0;
+            const dialogsColRef = collection(db, 'users', user.uid, 'dialogs');
+            const dialogsSnapshot = await getDocs(dialogsColRef);
+
+            for (const dialogDoc of dialogsSnapshot.docs) {
+                const notesColRef = collection(db, 'users', user.uid, 'dialogs', dialogDoc.id, 'notes');
+                const notesSnapshot = await getDocs(notesColRef);
+                totalNotes += notesSnapshot.docs.length;
+            }
+            notesCount.value = totalNotes;
+        } catch (e) {
+            console.error("加载笔记总数失败:", e);
+            notesCount.value = 0;
+        }
     }
 });
 

@@ -15,6 +15,10 @@
                     <span class="material-icons">person</span>
                     个人资料
                 </router-link>
+                <router-link to="/my-favorites" class="dropdown-item">
+                    <span class="material-icons">favorite</span>
+                    收藏对话
+                </router-link>
                 <button class="dropdown-item" @click="handleLogout">
                     <span class="material-icons">logout</span>
                     退出登录
