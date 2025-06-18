@@ -182,7 +182,7 @@ function isWithinPeriod(dateStr, period) {
         const months = {
             '1m': 1,
             '3m': 3,
-            '6m': 6
+            '6m': 7
         };
         
         const monthDiff = months[period];
