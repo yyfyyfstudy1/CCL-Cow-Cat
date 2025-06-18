@@ -65,7 +65,7 @@ export async function uploadAudioToLambda(audioBlob, filename) {
         }
 
     } catch (error) {
-        console.error('通过 Lambda 上传音频失败:', error);
+        // console.error('通过 Lambda 上传音频失败:', error);
         throw error;
     }
 }

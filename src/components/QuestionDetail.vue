@@ -704,7 +704,10 @@ async function startRecording(dialogId) {
       // 记录已学对话
       const dialog = dialogs.value[dialogId]
       if (dialog?.original?.id) {
-        await markAsLearned(route.params.qid, String(dialog.original.id))
+        // 只在非收藏模式下记录已学
+        if (!isFavoritesMode.value) {
+          await markAsLearned(route.params.qid, String(dialog.original.id))
+        }
       }
 
       // 生成文件名（使用当前时间，精确到分钟）
