@@ -420,16 +420,35 @@ async function loadPageData() {
 
       dialogs.value = favoriteItems.map(item => {
         const id = String(item.id)
+        // 找到原始对话行（题目）
         const originalRow = data.rows.find(r => String(r.id) === id)
-        const translationRow = data.rows.find(r => String(r.id) === String(Number(id) + 1))
+        
+        // 找到对应的答案行
+        let translationRow = null
+        if (originalRow) {
+          // 根据原始行的 qid 找到所有相关行
+          const rowsForQid = data.byQid[originalRow.qid] || []
+          // 找到原始行在数组中的索引
+          const originalIndex = rowsForQid.findIndex(r => String(r.id) === id)
+          if (originalIndex !== -1) {
+            // 题目后面一定是答案
+            if (originalIndex + 1 < rowsForQid.length) {
+              translationRow = rowsForQid[originalIndex + 1]
+            }
+          }
+        }
 
-        console.log(`Loading favorite dialog ${id}, mastery: ${item.mastery}`)
+        // 添加打印语句
+        console.log(`\n收藏对话 ${id} 的翻译内容：`)
+        console.log('原文：', originalRow?.text || '无原文')
+        console.log('翻译：', translationRow?.text || '无翻译')
+        console.log('-------------------')
 
         return {
           original: {
             text: originalRow?.text || '',
             audio: originalRow?.audio1 || '',
-            isQuestion: 1, // 收藏的对话都视为问题类型
+            isQuestion: 1, // 收藏的总是题目
             id: id,
             associatedQid: originalRow?.qid || null,
             associatedTitle: originalRow?.title || '未知题目'
@@ -438,15 +457,48 @@ async function loadPageData() {
             text: translationRow?.text || '',
             audio: translationRow?.audio1 || ''
           },
-          mastery: item.mastery, // 将熟练度传递给对话数据
-          createdAt: item.createdAt, // 将创建时间传递给对话数据
-          showNotes: false, // 默认不显示笔记部分
-          dialogNotes: [], // 初始化空笔记列表
-          qid: originalRow?.qid || null, // 将关联的qid保存到每个对话对象
-          title: originalRow?.title || '未知题目', // 将关联的title保存到每个对话对象
-          type: originalRow?.type || '' // 将关联的type保存到每个对话对象
+          mastery: item.mastery,
+          createdAt: item.createdAt,
+          showNotes: false,
+          dialogNotes: [],
+          qid: originalRow?.qid || null,
+          title: originalRow?.title || '未知题目',
+          type: originalRow?.type || ''
         }
       })
+
+      // 根据当前排序模式对对话进行排序
+      if (isFavoritesMode.value) {
+        // 保存原始顺序的录音列表
+        const originalRecordings = { ...recordingsList.value }
+        
+        // 对对话进行排序
+        dialogs.value.sort((a, b) => {
+          if (currentSortMode.value === 'createdAt') {
+            // 按添加时间排序
+            const timeA = a.createdAt || 0
+            const timeB = b.createdAt || 0
+            return sortOrder.value === 'desc' ? timeB - timeA : timeA - timeB
+          } else if (currentSortMode.value === 'mastery') {
+            // 按熟练度排序
+            const masteryA = a.mastery || 0
+            const masteryB = b.mastery || 0
+            return sortOrder.value === 'desc' ? masteryB - masteryA : masteryA - masteryB
+          }
+          return 0
+        })
+
+        // 重新映射录音列表到新的顺序
+        const newRecordings = {}
+        dialogs.value.forEach((dialog, newIndex) => {
+          const originalIndex = dialog.original.id
+          if (originalRecordings[originalIndex]) {
+            newRecordings[newIndex] = originalRecordings[originalIndex]
+          }
+        })
+        recordingsList.value = newRecordings
+      }
+
       pageTitle.value = '我的收藏对话' // 收藏页面标题
       // 其他收藏页面特有的标题/信息可以设置，这里暂不设置 intro, type, date, extraMention
     } else {
@@ -865,12 +917,72 @@ async function updateMastery(dialogId, newMastery) {
 function toggleSortMode() {
   currentSortMode.value = currentSortMode.value === 'createdAt' ? 'mastery' : 'createdAt'
   console.log(`排序模式已切换为: ${currentSortMode.value === 'createdAt' ? '添加时间' : '熟练度'}`)
+  
+  // 重新排序对话和录音
+  if (isFavoritesMode.value) {
+    // 保存原始顺序的录音列表
+    const originalRecordings = { ...recordingsList.value }
+    
+    // 对对话进行排序
+    dialogs.value.sort((a, b) => {
+      if (currentSortMode.value === 'createdAt') {
+        const timeA = a.createdAt || 0
+        const timeB = b.createdAt || 0
+        return sortOrder.value === 'desc' ? timeB - timeA : timeA - timeB
+      } else if (currentSortMode.value === 'mastery') {
+        const masteryA = a.mastery || 0
+        const masteryB = b.mastery || 0
+        return sortOrder.value === 'desc' ? masteryB - masteryA : masteryA - masteryB
+      }
+      return 0
+    })
+
+    // 重新映射录音列表到新的顺序
+    const newRecordings = {}
+    dialogs.value.forEach((dialog, newIndex) => {
+      const originalIndex = dialog.original.id
+      if (originalRecordings[originalIndex]) {
+        newRecordings[newIndex] = originalRecordings[originalIndex]
+      }
+    })
+    recordingsList.value = newRecordings
+  }
 }
 
 // 新增：切换排序方向
 function toggleSortOrder() {
   sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
   console.log(`排序方向已切换为: ${sortOrder.value === 'desc' ? '降序' : '升序'}`)
+  
+  // 重新排序对话和录音
+  if (isFavoritesMode.value) {
+    // 保存原始顺序的录音列表
+    const originalRecordings = { ...recordingsList.value }
+    
+    // 对对话进行排序
+    dialogs.value.sort((a, b) => {
+      if (currentSortMode.value === 'createdAt') {
+        const timeA = a.createdAt || 0
+        const timeB = b.createdAt || 0
+        return sortOrder.value === 'desc' ? timeB - timeA : timeA - timeB
+      } else if (currentSortMode.value === 'mastery') {
+        const masteryA = a.mastery || 0
+        const masteryB = b.mastery || 0
+        return sortOrder.value === 'desc' ? masteryB - masteryA : masteryA - masteryB
+      }
+      return 0
+    })
+
+    // 重新映射录音列表到新的顺序
+    const newRecordings = {}
+    dialogs.value.forEach((dialog, newIndex) => {
+      const originalIndex = dialog.original.id
+      if (originalRecordings[originalIndex]) {
+        newRecordings[newIndex] = originalRecordings[originalIndex]
+      }
+    })
+    recordingsList.value = newRecordings
+  }
 }
 
 // 新增：加载笔记函数
