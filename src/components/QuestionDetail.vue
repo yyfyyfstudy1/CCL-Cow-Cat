@@ -255,6 +255,15 @@
                                 开始录音
                             </template>
                         </button>
+                        <button
+                            v-if="isRecording"
+                            class="cancel-btn"
+                            @click="cancelRecording"
+                            title="取消录音"
+                            style="margin-left: 12px;"
+                        >
+                            <span class="material-icons">close</span>
+                        </button>
                     </div>
 
                     <div v-if="recordingsList[idx]?.length">
@@ -627,22 +636,27 @@ onMounted(() => {
   if (!hasShownNotification) {
     showNotification.value = true
   }
-  // 笔记加载现在由 toggleNotesSection 触发，或者在 /dialog/:qid 模式下在 loadPageData 触发
-  // 如果是 /dialog/:qid 模式，并且不是收藏模式，确保笔记加载
-  if (!isFavoritesMode.value && dialogs.value.length > 0) {
-    // For /dialog/:qid, we assume the first dialog in the `dialogs` array is the main one for notes
-    // This will load notes for the first dialog part of the current QID
-    // However, if notes are per 'dialog' (original/translation pair), then each would have its own.
-    // Since the notes icon will be per dialog part, the toggleNotesSection will handle loading.
-    // So, no explicit loading here is needed for non-favorites mode either.
-  }
+  // 自动恢复音频加载
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 })
+
 onUnmounted(() => {
   // 卸载时释放所有 Blob URL
   Object.values(recordingsList.value)
     .flat()
     .forEach(r => URL.revokeObjectURL(r.url))
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
+
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    // 重新加载所有 audio 元素
+    const audios = document.querySelectorAll('audio');
+    audios.forEach(audio => {
+      audio.load();
+    });
+  }
+}
 
 /**
  * 根据对话原文内容自动选择识别语言
