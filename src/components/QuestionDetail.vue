@@ -226,23 +226,34 @@
                             class="record-btn"
                             :class="{
                                 recording: isRecording,
-                                'api-loading': isApiLoading && !isRecording
+                                'api-loading': isApiLoading && !isRecording,
+                                'no-bg': isApiLoading && currentTranscribingDialogId === idx
                             }"
                             :disabled="isApiLoading && !isRecording"
                             @click="isRecording ? stopRecording() : startRecording(idx)"
                         >
-                            <span class="material-icons">{{ isRecording ? 'stop' : 'mic' }}</span>
-                            {{ isRecording ? '停止录音' : (isApiLoading ? '处理中...' : '开始录音') }}
-                        </button>
-
-                        <!-- 新增取消按钮 -->
-                        <button
-                            v-if="isRecording"
-                            class="cancel-btn"
-                            @click="cancelRecording"
-                            title="取消录音"
-                        >
-                            <span class="material-icons">close</span>
+                            <template v-if="isRecording">
+                                <span class="material-icons">stop</span>
+                                停止录音
+                            </template>
+                            <template v-else-if="isApiLoading && currentTranscribingDialogId === idx">
+                                <span v-if="transcribingStatus === 'transcribing'">
+                                    <Vue3Lottie :animationLink="'/lottie/loading.json'" :loop="true" style="width:65px;height:65px;display:inline-block;vertical-align:middle;" />
+                                    <span style="font-size:16px;margin-left:8px;">语音转录中...</span>
+                                </span>
+                                <span v-else-if="transcribingStatus === 'scoring'">
+                                    <Vue3Lottie :animationLink="'/lottie/ai-score.json'" :loop="true" style="width:65px;height:65px;display:inline-block;vertical-align:middle;" />
+                                    <span style="font-size:16px;margin-left:8px;">AI打分中...</span>
+                                </span>
+                                <span v-else>
+                                    <Vue3Lottie :animationLink="'/lottie/loading.json'" :loop="true" style="width:65px;height:65px;display:inline-block;vertical-align:middle;" />
+                                    <span style="font-size:16px;margin-left:8px;">处理中...</span>
+                                </span>
+                            </template>
+                            <template v-else>
+                                <span class="material-icons">mic</span>
+                                开始录音
+                            </template>
                         </button>
                     </div>
 
@@ -282,6 +293,10 @@
                     </div>
                 </div>
             </div>
+        </div>
+        <!-- 错误弹窗 -->
+        <div v-if="showRecordError" class="record-error-toast">
+            {{ recordError }}
         </div>
     </div>
 </template>
@@ -461,7 +476,7 @@ async function loadPageData() {
         const id = String(item.id)
         // 找到原始对话行（题目）
         const originalRow = data.rows.find(r => String(r.id) === id)
-        
+
         // 找到对应的答案行
         let translationRow = null
         if (originalRow) {
@@ -510,7 +525,7 @@ async function loadPageData() {
       if (isFavoritesMode.value) {
         // 保存原始顺序的录音列表
         const originalRecordings = { ...recordingsList.value }
-        
+
         // 对对话进行排序
         dialogs.value.sort((a, b) => {
           if (currentSortMode.value === 'createdAt') {
@@ -737,6 +752,8 @@ function audioBufferToWav(buffer) {
  */
 async function startRecording(dialogId) {
   try {
+    recordError.value = '' // 开始录音时清空错误
+    showRecordError.value = false
     isCancelled.value = false
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -763,7 +780,6 @@ async function startRecording(dialogId) {
 
     await pStop
 
-    // 如果是取消录音，直接返回
     if (isCancelled.value) {
       return
     }
@@ -773,15 +789,16 @@ async function startRecording(dialogId) {
     })
     const url = URL.createObjectURL(blob)
 
-    // 获取原文内容
     const originalText = dialogs.value[dialogId]?.original.text || ''
     let translatedText = '未转录'
     let aiCheckResult = null
 
     try {
       isApiLoading.value = true
+      transcribingStatus.value = 'transcribing'
+      currentTranscribingDialogId.value = dialogId
 
-      // 调用音频转录服务
+      // 1. 转录
       const translatedText = await transcribeAudio(
         blob,
         detectLang(dialogId),
@@ -789,33 +806,27 @@ async function startRecording(dialogId) {
       )
       const trimmedText = translatedText.trim()
 
-      // AI 翻译评估
+      // 2. AI打分
+      transcribingStatus.value = 'scoring'
       aiCheckResult = await checkTranslation(originalText, trimmedText)
 
-      // 记录已学对话
+      // 3. 记录已学
       const dialog = dialogs.value[dialogId]
       if (dialog?.original?.id) {
-        // 只在非收藏模式下记录已学
         if (!isFavoritesMode.value) {
           await markAsLearned(route.params.qid, String(dialog.original.id))
         }
       }
 
-      // 生成文件名（使用当前时间，精确到分钟）
+      // 4. 上传
       const now = new Date()
       const filename = now.toISOString().replace(/[:.]/g, '-').split('.')[0] + '.wav'
-
-      // 异步上传到 Google Drive
       const blobCopy = blob.slice(0)
       Promise.resolve().then(async () => {
         try {
-          // 转换为 WAV 格式
           const wavBlob = await convertToWav(blobCopy)
-          const uploadResult = await uploadAudioToLambda(wavBlob, filename)
-          // 如果需要，可以在这里处理上传成功后的逻辑
-        } catch (err) {
-          // console.error('音频上传失败:', err)
-        }
+          await uploadAudioToLambda(wavBlob, filename)
+        } catch (err) {}
       })
 
       if (!recordingsList.value[dialogId]) recordingsList.value[dialogId] = []
@@ -827,14 +838,17 @@ async function startRecording(dialogId) {
       })
 
     } catch (err) {
-      console.error('语音转录或翻译检查失败:', err)
       aiCheckResult = '转录或翻译检查失败'
+      recordError.value = '语音转录或AI打分失败，请检查网络或稍后重试，再次点击"开始录音"可重新尝试。'
+      showRecordError.value = true
+      setTimeout(() => { showRecordError.value = false }, 3000)
     } finally {
       isApiLoading.value = false
+      transcribingStatus.value = 'idle'
+      currentTranscribingDialogId.value = null
     }
 
   } catch (err) {
-    console.error('录音失败', err)
     alert('无法访问麦克风，请检查权限')
   } finally {
     if (mediaRecorder.value) {
@@ -842,6 +856,8 @@ async function startRecording(dialogId) {
     }
     isRecording.value = false
     isApiLoading.value = false
+    transcribingStatus.value = 'idle'
+    currentTranscribingDialogId.value = null
   }
 }
 
@@ -956,12 +972,12 @@ async function updateMastery(dialogId, newMastery) {
 function toggleSortMode() {
   currentSortMode.value = currentSortMode.value === 'createdAt' ? 'mastery' : 'createdAt'
   console.log(`排序模式已切换为: ${currentSortMode.value === 'createdAt' ? '添加时间' : '熟练度'}`)
-  
+
   // 重新排序对话和录音
   if (isFavoritesMode.value) {
     // 保存原始顺序的录音列表
     const originalRecordings = { ...recordingsList.value }
-    
+
     // 对对话进行排序
     dialogs.value.sort((a, b) => {
       if (currentSortMode.value === 'createdAt') {
@@ -992,12 +1008,12 @@ function toggleSortMode() {
 function toggleSortOrder() {
   sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
   console.log(`排序方向已切换为: ${sortOrder.value === 'desc' ? '降序' : '升序'}`)
-  
+
   // 重新排序对话和录音
   if (isFavoritesMode.value) {
     // 保存原始顺序的录音列表
     const originalRecordings = { ...recordingsList.value }
-    
+
     // 对对话进行排序
     dialogs.value.sort((a, b) => {
       if (currentSortMode.value === 'createdAt') {
@@ -1106,6 +1122,11 @@ function toggleNotesSection(dialog) {
     loadNotes(dialog);
   }
 }
+
+const transcribingStatus = ref('idle') // 'idle' | 'transcribing' | 'scoring' | 'done'
+const currentTranscribingDialogId = ref(null)
+const recordError = ref('')
+const showRecordError = ref(false)
 </script>
 
 <style scoped>
@@ -1346,9 +1367,12 @@ h3 {
 }
 
 .record-btn:disabled {
-    opacity: 0.7;
     cursor: not-allowed;
     transform: none !important;
+}
+
+.record-btn:disabled:not(.no-bg) {
+    opacity: 0.7;
 }
 
 .record-btn.recording {
@@ -1360,6 +1384,11 @@ h3 {
 .record-btn.api-loading {
     background: #f5f5f5;
     color: #757575;
+}
+
+.record-btn.no-bg {
+    background: transparent !important;
+    box-shadow: none !important;
 }
 
 .record-btn .material-icons {
@@ -1993,5 +2022,27 @@ h3 {
 
 .action-btn .material-icons {
     font-size: 18px;
+}
+
+.record-error-toast {
+  position: fixed;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000;
+  background: #fff0f0;
+  color: #d32f2f;
+  border: 1px solid #f5c6cb;
+  border-radius: 8px;
+  padding: 16px 32px;
+  font-size: 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  animation: fadeInOut 3s;
+}
+@keyframes fadeInOut {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { opacity: 0; }
 }
 </style>

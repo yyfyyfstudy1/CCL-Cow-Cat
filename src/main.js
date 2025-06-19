@@ -4,6 +4,7 @@ import router from './router';
 import { Analytics } from '@vercel/analytics/vue';
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
+import Vue3Lottie from 'vue3-lottie';
 
 // Firebase 配置
 const firebaseConfig = {
@@ -23,4 +24,5 @@ const auth = getAuth(firebaseApp);
 const app = createApp(App);
 app.use(router);
 app.use(Analytics);
+app.use(Vue3Lottie);
 app.mount('#app');
