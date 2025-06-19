@@ -109,9 +109,14 @@
                 <div class="dialog-part">
                     <div class="content-header">
                         <div class="label">原文</div>
-                        <button class="toggle-btn" @click="toggleDialog(idx, 'original')">
-                            {{ isDialogOpen(idx, 'original') ? '隐藏' : '显示' }}
-                        </button>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <button v-if="isDialogOpen(idx, 'original')" class="action-btn" title="复制原文" @click="copyText(dialog.original.text, 'original', idx)">
+                                <span class="material-icons">{{ copyStatus[getCopyKey('original', idx)] ? 'check' : 'content_copy' }}</span>
+                            </button>
+                            <button class="toggle-btn" @click="toggleDialog(idx, 'original')">
+                                {{ isDialogOpen(idx, 'original') ? '隐藏' : '显示' }}
+                            </button>
+                        </div>
                     </div>
                     <transition name="fade">
                         <p v-if="isDialogOpen(idx, 'original')" class="content-text">
@@ -130,9 +135,14 @@
                 <div class="dialog-part">
                     <div class="content-header">
                         <div class="label">参考翻译</div>
-                        <button class="toggle-btn" @click="toggleDialog(idx, 'translation')">
-                            {{ isDialogOpen(idx, 'translation') ? '隐藏' : '显示' }}
-                        </button>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <button v-if="isDialogOpen(idx, 'translation')" class="action-btn" title="复制翻译" @click="copyText(dialog.translation.text, 'translation', idx)">
+                                <span class="material-icons">{{ copyStatus[getCopyKey('translation', idx)] ? 'check' : 'content_copy' }}</span>
+                            </button>
+                            <button class="toggle-btn" @click="toggleDialog(idx, 'translation')">
+                                {{ isDialogOpen(idx, 'translation') ? '隐藏' : '显示' }}
+                            </button>
+                        </div>
                     </div>
                     <transition name="fade">
                         <p v-if="isDialogOpen(idx, 'translation')" class="content-text">
@@ -374,6 +384,35 @@ const sortedDialogs = computed(() => {
     return dialogs.value
   }
 })
+
+// 复制按钮状态：{ 'original-对话idx': false, 'translation-对话idx': false }
+const copyStatus = ref({})
+
+function getCopyKey(type, idx) {
+  return `${type}-${idx}`
+}
+
+function copyText(text, type, idx) {
+  if (!text) return;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text);
+  } else {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand('copy');
+    } catch (err) {}
+    document.body.removeChild(textarea);
+  }
+  // 设置勾号状态
+  const key = getCopyKey(type, idx)
+  copyStatus.value[key] = true
+  setTimeout(() => {
+    copyStatus.value[key] = false
+  }, 2000)
+}
 
 async function retryLoad() {
   error.value = null
