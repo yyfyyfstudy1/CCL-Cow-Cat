@@ -138,7 +138,7 @@ async function loadLearnedDialogs() {
 function getCompletionPercentage(qid) {
     const qidLearned = learnedDialogs.value[qid];
     if (!qidLearned) return 0;
-    
+
     const learnedCount = Object.keys(qidLearned).length;
     // 计算实际对话数量：(总行数 - 1) / 2
     // -1 是因为第一行是题目信息
@@ -162,10 +162,10 @@ const availableTypes = computed(() => {
 function isWithinPeriod(dateStr, period) {
     // 如果没有选择时间段，显示所有内容（包括空日期）
     if (!period) return true;
-    
+
     // 如果选择了时间段但日期为空，不显示
     if (!dateStr) return false;
-    
+
     try {
         const now = new Date();
         // 处理日期格式 YY-MM-DD
@@ -173,7 +173,7 @@ function isWithinPeriod(dateStr, period) {
         // 将两位数年份转换为四位数（假设20xx年）
         const fullYear = 2000 + year;
         const questionDate = new Date(fullYear, month - 1, day);
-        
+
         if (isNaN(questionDate.getTime())) {
             console.warn('Invalid date:', dateStr);
             return false; // 如果日期无效，在筛选时不显示
@@ -182,12 +182,12 @@ function isWithinPeriod(dateStr, period) {
         const months = {
             '1m': 1,
             '3m': 3,
-            '6m': 7
+            '6m': 6
         };
-        
+
         const monthDiff = months[period];
         if (!monthDiff) return true;
-        
+
         const cutoff = new Date(now.getFullYear(), now.getMonth() - monthDiff, now.getDate());
         return questionDate >= cutoff;
     } catch (err) {
