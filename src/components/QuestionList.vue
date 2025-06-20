@@ -353,8 +353,13 @@ function toDetail(qid) {
 }
 
 .title {
-    font-size: 14px;
+    font-size: 16px;
     color: #333;
+    font-weight: 600;
+    word-break: break-word;
+    white-space: normal;
+    max-width: 320px;
+    line-height: 1.4;
 }
 
 .tags {

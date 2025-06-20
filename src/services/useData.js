@@ -36,7 +36,7 @@ async function loadExcel() {
 
         // 将 Excel 数据转换为数组，并指定列名
         const rows = XLSX.utils.sheet_to_json(sheet, {
-            header: ['qid', 'title', 'text', 'audio1', 'audio2', 'type', 'date', 'extraMention', 'questionTag', 'isQuestion', 'id'],
+            header: ['qid', 'title', 'text', 'audio1', 'audio2', 'type', 'date', 'extraMention', 'questionTag', 'id', 'isQuestion'],
             range: 1  // 跳过标题行
         });
 
