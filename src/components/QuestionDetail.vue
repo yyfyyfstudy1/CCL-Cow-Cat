@@ -365,6 +365,7 @@ const showNotification = ref(false)
 
 const { loadExcel, data } = useData()
 const S3_BASE_URL = "https://cclcowcatresource.s3.ap-southeast-2.amazonaws.com";
+const S3_AUDIO_PATH = import.meta.env.VITE_S3_AUDIO_PATH || '/audio';
 
 // 收藏相关
 const favoriteIds = ref([])
@@ -456,7 +457,7 @@ function isDialogOpen(idx, type) {
   return !!dialogStates.value[getDialogKey(idx, type)]
 }
 function audioSrc(rel) {
-  return rel ? `${S3_BASE_URL}/audio${rel}` : '';
+  return rel ? `${S3_BASE_URL}${S3_AUDIO_PATH}${rel}` : '';
 }
 
 // 统一的数据加载函数
