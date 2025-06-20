@@ -15,6 +15,10 @@
                     {{ type }}
                     <span class="remove" @click.stop="removeType(type)">&times;</span>
                 </span>
+                <span v-for="tag in selectedTags" :key="tag" class="tag tag-question">
+                    {{ tag }}
+                    <span class="remove" @click.stop="removeTag(tag)">&times;</span>
+                </span>
             </div>
             <span class="clear-all" v-if="hasFilters" @click.stop="clearAll">&times;</span>
         </div>
@@ -50,8 +54,8 @@
                     时间
                 </div>
                 <div class="section-content">
-                    <div class="filter-item" 
-                        v-for="(label, value) in periodLabel" 
+                    <div class="filter-item"
+                        v-for="(label, value) in periodLabel"
                         :key="value"
                         :class="{ active: filters.period === value }"
                         @click="setPeriod(value)">
@@ -68,13 +72,31 @@
                     类型
                 </div>
                 <div class="section-content">
-                    <div class="filter-item" 
-                        v-for="type in types" 
+                    <div class="filter-item"
+                        v-for="type in types"
                         :key="type"
                         :class="{ active: selectedTypes.includes(type) }"
                         @click="toggleType(type)">
                         <span class="material-icons">local_offer</span>
                         {{ type }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 标签筛选 -->
+            <div class="filter-section">
+                <div class="section-title">
+                    <span class="material-icons">sell</span>
+                    标签
+                </div>
+                <div class="section-content">
+                    <div class="filter-item"
+                        v-for="tag in tags"
+                        :key="tag"
+                        :class="{ active: selectedTags.includes(tag) }"
+                        @click="toggleTag(tag)">
+                        <span class="material-icons">sell</span>
+                        {{ tag }}
                     </div>
                 </div>
             </div>
@@ -90,12 +112,17 @@ const props = defineProps({
         type: Array,
         default: () => []
     },
+    tags: {
+        type: Array,
+        default: () => []
+    },
     filters: {
         type: Object,
         default: () => ({
             type: [],
             period: '',
-            studyStatus: ''
+            studyStatus: '',
+            tag: []
         })
     }
 });
@@ -115,8 +142,12 @@ const selectedTypes = computed(() => {
     return Array.isArray(props.filters.type) ? props.filters.type : [];
 });
 
+const selectedTags = computed(() => {
+    return Array.isArray(props.filters.tag) ? props.filters.tag : [];
+});
+
 const hasFilters = computed(() => {
-    return props.filters.period || selectedTypes.value.length > 0;
+    return props.filters.period || selectedTypes.value.length > 0 || selectedTags.value.length > 0;
 });
 
 // 处理点击外部关闭下拉菜单
@@ -178,7 +209,8 @@ function clearAll() {
     emit('update:filters', {
         type: [],
         period: '',
-        studyStatus: ''
+        studyStatus: '',
+        tag: []
     });
 }
 
@@ -186,6 +218,28 @@ function setStudyStatus(status) {
     emit('update:filters', {
         ...props.filters,
         studyStatus: status
+    });
+}
+
+function toggleTag(tag) {
+    const tags = new Set(selectedTags.value);
+    if (tags.has(tag)) {
+        tags.delete(tag);
+    } else {
+        tags.add(tag);
+    }
+    emit('update:filters', {
+        ...props.filters,
+        tag: Array.from(tags)
+    });
+}
+
+function removeTag(tag) {
+    const tags = new Set(selectedTags.value);
+    tags.delete(tag);
+    emit('update:filters', {
+        ...props.filters,
+        tag: Array.from(tags)
     });
 }
 </script>
@@ -236,6 +290,11 @@ function setStudyStatus(status) {
 }
 
 .type-tag {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.tag-question {
     background-color: #e8f5e9;
     color: #2e7d32;
 }
@@ -315,4 +374,4 @@ function setStudyStatus(status) {
 .material-icons {
     font-size: 18px;
 }
-</style> 
+</style>
