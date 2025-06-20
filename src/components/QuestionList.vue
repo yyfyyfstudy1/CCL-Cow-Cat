@@ -19,7 +19,6 @@
             <!-- 筛选面板 -->
             <FilterPanel
                 :types="availableTypes"
-                :tags="availableTags"
                 v-model:filters="filters"
                 @random="loadRandomQuestion"
             />
@@ -36,7 +35,6 @@
                             <div class="tags">
                                 <span v-if="q.type" class="tag type-tag">{{ q.type }}</span>
                                 <span v-if="q.date" class="tag date-tag">{{ q.date }}</span>
-                                <span v-if="q.questionTag" class="tag tag-question">{{ q.questionTag }}</span>
                             </div>
                         </div>
                         <div class="right-content">
@@ -87,8 +85,7 @@ const error = ref(null);
 const filters = ref({
     type: [],
     period: '',
-    studyStatus: '',
-    tag: []
+    studyStatus: ''
 });
 
 // 监听筛选条件变化，重置页码
@@ -161,17 +158,6 @@ const availableTypes = computed(() => {
     return Array.from(types);
 });
 
-// 获取所有可用的标签
-const availableTags = computed(() => {
-    const tags = new Set();
-    Object.values(data.byQid).forEach(rows => {
-        if (rows[0]?.questionTag) {
-            tags.add(rows[0].questionTag);
-        }
-    });
-    return Array.from(tags);
-});
-
 // 根据日期筛选
 function isWithinPeriod(dateStr, period) {
     // 如果没有选择时间段，显示所有内容（包括空日期）
@@ -217,17 +203,14 @@ const filteredList = computed(() => {
             qid,
             title: rows[0]?.title || '未命名',
             type: rows[0]?.type || '',
-            date: rows[0]?.date || '',
-            questionTag: rows[0]?.questionTag || ''
+            date: rows[0]?.date || ''
         }))
         .filter(item => {
             // 类型筛选：如果选择了类型，则必须匹配其中之一
             const typeMatch = !filters.value.type.length || filters.value.type.includes(item.type);
-            // 标签筛选：如果选择了标签，则必须匹配其中之一
-            const tagMatch = !filters.value.tag.length || filters.value.tag.includes(item.questionTag);
             // 日期筛选
             const dateMatch = isWithinPeriod(item.date, filters.value.period);
-            return typeMatch && tagMatch && dateMatch;
+            return typeMatch && dateMatch;
         });
 });
 
@@ -329,7 +312,7 @@ function toDetail(qid) {
 }
 
 .question-content {
-    padding: 10px;
+    padding: 16px;
     background: #f8f9fa;
     border-radius: 8px;
     cursor: pointer;
@@ -337,7 +320,6 @@ function toDetail(qid) {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 13px;
 }
 
 .question-content:hover {
@@ -348,7 +330,7 @@ function toDetail(qid) {
 .left-content {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 12px;
     flex: 1;
 }
 
@@ -364,13 +346,13 @@ function toDetail(qid) {
 
 .tags {
     display: flex;
-    gap: 4px;
+    gap: 8px;
 }
 
 .tag {
-    padding: 2px 6px;
+    padding: 4px 8px;
     border-radius: 4px;
-    font-size: 12px;
+    font-size: 14px;
 }
 
 .type-tag {
@@ -383,20 +365,15 @@ function toDetail(qid) {
     color: #f57f17;
 }
 
-.tag-question {
-    background-color: #e3f2fd;
-    color: #1976d2;
-}
-
 .qid {
     color: #666;
-    font-size: 12px;
+    font-size: 14px;
 }
 
 .right-content {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 12px;
 }
 
 .progress-bar-container {
@@ -414,17 +391,17 @@ function toDetail(qid) {
 }
 
 .completion-text {
-    font-size: 12px;
+    font-size: 14px;
     color: #333;
     font-weight: 500;
-    min-width: 32px;
+    min-width: 40px;
 }
 
 .login-prompt {
-    font-size: 11px;
+    font-size: 12px;
     color: #999;
     text-align: center;
-    width: 90px;
+    width: 120px;
     flex-shrink: 0;
 }
 
