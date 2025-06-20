@@ -9,6 +9,9 @@
                 <router-link to="/" class="icon-button" title="题目列表">
                     <span class="material-icons">menu_book</span>
                 </router-link>
+                <router-link to="/walkman" class="icon-button" title="随身听">
+                    <span class="material-icons">headphones</span>
+                </router-link>
                 <UserAvatar />
             </div>
         </div>
@@ -89,4 +92,4 @@ import UserAvatar from './UserAvatar.vue';
 .icon-button .material-icons {
     font-size: 28px; /* 调整图标大小，使其在40px容器中更协调 */
 }
-</style> 
+</style>

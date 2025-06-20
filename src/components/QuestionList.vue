@@ -1,5 +1,5 @@
 <template>
-    <div class="container">
+    <div :class="['container', { 'with-walkman-padding': $route.path === '/walkman' }]" :style="$route.path === '/walkman' ? { paddingBottom: walkmanPadding + 'px' } : {}">
         <h1 style="font-size:24px;font-weight:700;margin-bottom:24px">
             对话列表
         </h1>
@@ -69,16 +69,28 @@
                 </button>
             </div>
         </template>
+
+        <!-- WalkmanPlayer 只在 /walkman 路由下显示 -->
+        <WalkmanPlayer v-if="$route.path === '/walkman'" :qid-list="paged.map(q => q.qid)" v-model:currentQid="selectedQid" />
     </div>
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import { useData } from '../services/useData.js';
 import FilterPanel from './FilterPanel.vue';
 import { getAllLearned } from '../services/learned.js'
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { defineProps, defineEmits } from 'vue';
+import WalkmanPlayer from './WalkmanPlayer.vue';
+
+const props = defineProps({
+    isWalkmanMode: { type: Boolean, default: false },
+});
+const emit = defineEmits(['playQid']);
+
+const $route = useRoute();
 
 const router = useRouter();
 const cur = ref(1);
@@ -100,6 +112,30 @@ const { loadExcel, data } = useData();
 
 const learnedDialogs = ref({});
 const isLoggedIn = ref(false);
+const walkmanPadding = ref(300)
+const selectedQid = ref(null)
+
+function updatePadding() {
+    walkmanPadding.value = window.isWalkmanCollapsed ? 80 : 300
+}
+
+onMounted(() => {
+    const auth = getAuth();
+    onAuthStateChanged(auth, (user) => {
+        isLoggedIn.value = !!user;
+        if (user) {
+            loadLearnedDialogs();
+        } else {
+            learnedDialogs.value = {};
+        }
+    });
+
+    window.addEventListener('walkman-collapse-change', updatePadding)
+    updatePadding()
+})
+onUnmounted(() => {
+    window.removeEventListener('walkman-collapse-change', updatePadding)
+})
 
 async function retryLoad() {
     error.value = null;
@@ -115,18 +151,6 @@ async function retryLoad() {
 
 // 初始加载
 retryLoad();
-
-onMounted(() => {
-    const auth = getAuth();
-    onAuthStateChanged(auth, (user) => {
-        isLoggedIn.value = !!user;
-        if (user) {
-            loadLearnedDialogs();
-        } else {
-            learnedDialogs.value = {};
-        }
-    });
-});
 
 async function loadLearnedDialogs() {
     try {
@@ -249,7 +273,12 @@ function loadRandomQuestion() {
 }
 
 function toDetail(qid) {
-    router.push({ name: 'dialog', params: { qid } });
+    selectedQid.value = qid
+    if (props.isWalkmanMode) {
+        window.dispatchEvent(new CustomEvent('walkman-play-qid', { detail: qid }));
+    } else {
+        router.push({ name: 'dialog', params: { qid } });
+    }
 }
 </script>
 
@@ -258,6 +287,9 @@ function toDetail(qid) {
     max-width: 800px;
     margin: 0 auto;
     padding: 20px;
+}
+.with-walkman-padding {
+    /* padding-bottom 由内联 style 控制 */
 }
 
 .error {

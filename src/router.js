@@ -19,6 +19,7 @@ const routes = [
         component: QuestionDetail,
         props: { mode: 'favorites' }
     },
+    { path: '/walkman', name: 'walkman', component: QuestionList },
     { path: '/:catchAll(.*)', redirect: '/' }
 ];
 

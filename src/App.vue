@@ -2,7 +2,14 @@
     <div class="app">
         <Header />
         <main class="main">
-            <router-view />
+            <div style="padding-top: 56px;">
+                <template v-if="$route.path === '/walkman'">
+                    <QuestionList :isWalkmanMode="true" />
+                </template>
+                <template v-else>
+                    <router-view />
+                </template>
+            </div>
         </main>
     </div>
     <Analytics />
@@ -17,6 +24,8 @@ import { Analytics } from '@vercel/analytics/vue';
 import UserAvatar from './components/UserAvatar.vue';
 import Mp3PollModal from './components/Mp3PollModal.vue';
 import NotificationBanner from './components/NotificationBanner.vue';
+import QuestionList from './components/QuestionList.vue';
+import WalkmanPlayer from './components/WalkmanPlayer.vue';
 
 const showMp3Poll = ref(false);
 
