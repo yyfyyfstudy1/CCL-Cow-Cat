@@ -3,12 +3,7 @@
         <Header />
         <main class="main">
             <div style="padding-top: 56px;">
-                <template v-if="$route.path === '/walkman'">
-                    <QuestionList :isWalkmanMode="true" />
-                </template>
-                <template v-else>
-                    <router-view />
-                </template>
+                <router-view />
             </div>
         </main>
     </div>
@@ -27,12 +22,13 @@ import { Analytics } from '@vercel/analytics/vue';
 import UserAvatar from './components/UserAvatar.vue';
 import Mp3PollModal from './components/Mp3PollModal.vue';
 import NotificationBanner from './components/NotificationBanner.vue';
-import QuestionList from './components/QuestionList.vue';
-import WalkmanPlayer from './components/WalkmanPlayer.vue';
 import LoginModal from './components/LoginModal.vue';
 import UserGuide from './components/UserGuide.vue';
 import FeedbackModal from './components/FeedbackModal.vue';
 import { useEventBus } from './services/eventBus.js';
+import { useData } from './services/useData.js';
+
+const { loadExcel } = useData();
 
 const { on } = useEventBus();
 const showMp3Poll = ref(false);
@@ -73,6 +69,7 @@ const openLoginModal = () => {
 };
 
 onMounted(() => {
+    loadExcel();
     on('open-login-modal', openLoginModal);
     on('start-user-guide', () => {
         showGuide.value = true;

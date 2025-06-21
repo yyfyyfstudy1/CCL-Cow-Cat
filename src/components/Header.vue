@@ -94,6 +94,7 @@ const openFeedback = () => {
     width: 40px; /* 与头像保持一致 */
     height: 40px; /* 与头像保持一致 */
     border-radius: 50%;
+    border: none; /* 移除边框 */
     color: #666;
     text-decoration: none;
     transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;

@@ -109,6 +109,7 @@ import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useData } from '../services/useData.js'
 import { getAuth, onAuthStateChanged } from "firebase/auth"
 import { getPlayerSettings, savePlayerSettings } from "../services/userSettings.js"
+import { markAsListened } from '../services/listeningProgress.js'
 
 const props = defineProps({
   qidList: { type: Array, default: () => [] },
@@ -234,6 +235,13 @@ const onTransAudioEnded = () => {
         setTimeout(() => replayCurrentAudio(), segmentGap.value * 1000)
         return
     }
+    
+    // 标记为已收听
+    if (currentDialog.value.qid && currentDialog.value.original?.id) {
+        markAsListened(currentDialog.value.qid, currentDialog.value.original.id);
+    }
+
+    // 片段重复次数已满，继续原有逻辑
     repeatTimes.value = 0
     if (currentDialogIndex.value < currentDialogs.value.length - 1) {
         autoPlayTimer.value = setTimeout(nextDialog, segmentGap.value * 1000)

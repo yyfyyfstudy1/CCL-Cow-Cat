@@ -1,5 +1,5 @@
 <template>
-    <div :class="['container', { 'with-walkman-padding': $route.path === '/walkman' }]" :style="$route.path === '/walkman' ? { paddingBottom: walkmanPadding + 'px' } : {}">
+    <div class="container" :style="isWalkmanMode ? { paddingBottom: walkmanPadding + 'px' } : {}">
         <h1 style="font-size:24px;font-weight:700;margin-bottom:24px">
             对话列表
         </h1>
@@ -40,18 +40,33 @@
                             </div>
                         </div>
                         <div class="right-content">
-                            <template v-if="isLoggedIn">
+                            <!-- 随身听模式 -->
+                            <template v-if="isWalkmanMode">
                                 <div class="progress-bar-container">
                                     <div class="progress-bar"
                                          :style="{
-                                            width: getCompletionPercentage(q.qid) + '% ',
-                                            backgroundColor: getCompletionPercentage(q.qid) === 100 ? '#4CAF50' : '#ffc107'
+                                            width: getListeningCompletionPercentage(q.qid) + '%',
+                                            backgroundColor: getListeningCompletionPercentage(q.qid) === 100 ? '#4CAF50' : '#2196F3'
                                         }">
                                     </div>
                                 </div>
-                                <span class="completion-text">{{ getCompletionPercentage(q.qid) }}%</span>
+                                <span class="completion-text">{{ getListeningCompletionPercentage(q.qid) }}%</span>
                             </template>
-                            <span v-else class="login-prompt">登录查看完成度</span>
+                            <!-- 默认练习模式 -->
+                            <template v-else>
+                                <template v-if="isLoggedIn">
+                                    <div class="progress-bar-container">
+                                        <div class="progress-bar"
+                                             :style="{
+                                                width: getCompletionPercentage(q.qid) + '%',
+                                                backgroundColor: getCompletionPercentage(q.qid) === 100 ? '#4CAF50' : '#ffc107'
+                                            }">
+                                        </div>
+                                    </div>
+                                    <span class="completion-text">{{ getCompletionPercentage(q.qid) }}%</span>
+                                </template>
+                                <span v-else class="login-prompt">登录查看完成度</span>
+                            </template>
                             <span class="qid">题号: {{ q.qid }}</span>
                         </div>
                     </div>
@@ -59,31 +74,49 @@
             </ul>
 
             <div v-if="pages > 1" class="pagination">
-                <button
-                    v-for="p in pages"
-                    :key="p"
-                    :class="['page-btn', { active: p === cur }]"
-                    @click="cur = p"
-                >
-                    {{ p }}
+                <button @click="prevPage" :disabled="cur === 1" class="page-btn nav-btn">
+                    <span class="material-icons">chevron_left</span>
+                </button>
+                <template v-for="(p, index) in computedPages" :key="index">
+                    <span v-if="p === '...'" class="page-ellipsis">...</span>
+                    <button
+                        v-else
+                        :class="['page-btn', { active: p === cur }]"
+                        @click="cur = p"
+                    >
+                        {{ p }}
+                    </button>
+                </template>
+                <button @click="nextPage" :disabled="cur === pages" class="page-btn nav-btn">
+                    <span class="material-icons">chevron_right</span>
                 </button>
             </div>
         </template>
 
-        <!-- WalkmanPlayer 只在 /walkman 路由下显示 -->
-        <WalkmanPlayer v-if="$route.path === '/walkman'" :qid-list="paged.map(q => q.qid)" v-model:currentQid="selectedQid" />
+        <!-- WalkmanPlayer 只在 isWalkmanMode 下显示 -->
+        <WalkmanPlayer v-if="isWalkmanMode" :qid-list="paged.map(q => q.qid)" v-model:currentQid="selectedQid" />
+        
+        <!-- 功能高亮提示 -->
+        <FeatureHighlight
+            :show="showProgressHighlight"
+            :target-selector="highlightInfo.selector"
+            :text="highlightInfo.text"
+            @close="closeProgressHighlight"
+        />
     </div>
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
+import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useData } from '../services/useData.js';
 import FilterPanel from './FilterPanel.vue';
 import { getAllLearned } from '../services/learned.js'
+import { getAllListeningProgress } from '../services/listeningProgress.js'
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { defineProps, defineEmits } from 'vue';
 import WalkmanPlayer from './WalkmanPlayer.vue';
+import FeatureHighlight from './FeatureHighlight.vue';
 
 const props = defineProps({
     isWalkmanMode: { type: Boolean, default: false },
@@ -95,7 +128,6 @@ const $route = useRoute();
 const router = useRouter();
 const cur = ref(1);
 const per = 25;
-const error = ref(null);
 const filters = ref({
     type: [],
     period: '',
@@ -108,12 +140,18 @@ watch(filters, () => {
     cur.value = 1;
 }, { deep: true });
 
-const { loadExcel, data } = useData();
+const { data } = useData();
 
 const learnedDialogs = ref({});
+const listeningProgress = ref({});
 const isLoggedIn = ref(false);
 const walkmanPadding = ref(300)
 const selectedQid = ref(null)
+
+const showProgressHighlight = ref(false);
+const highlightInfo = ref({ selector: '', text: '' });
+
+const isWalkmanMode = computed(() => $route.path === '/walkman');
 
 function updatePadding() {
     walkmanPadding.value = window.isWalkmanCollapsed ? 80 : 300
@@ -125,8 +163,12 @@ onMounted(() => {
         isLoggedIn.value = !!user;
         if (user) {
             loadLearnedDialogs();
+            loadListeningProgress();
+            // 延迟触发，确保DOM渲染完毕
+            setTimeout(triggerProgressHighlight, 1000);
         } else {
             learnedDialogs.value = {};
+            listeningProgress.value = {};
         }
     });
 
@@ -137,27 +179,21 @@ onUnmounted(() => {
     window.removeEventListener('walkman-collapse-change', updatePadding)
 })
 
-async function retryLoad() {
-    error.value = null;
-    try {
-        await loadExcel();
-        if (isLoggedIn.value) {
-            await loadLearnedDialogs();
-        }
-    } catch (err) {
-        error.value = err.message;
-    }
-}
-
-// 初始加载
-retryLoad();
-
 async function loadLearnedDialogs() {
     try {
         learnedDialogs.value = await getAllLearned();
     } catch (e) {
         console.error("加载已学对话失败:", e);
         learnedDialogs.value = {};
+    }
+}
+
+async function loadListeningProgress() {
+    try {
+        listeningProgress.value = await getAllListeningProgress();
+    } catch (e) {
+        console.error("加载收听进度失败:", e);
+        listeningProgress.value = {};
     }
 }
 
@@ -171,7 +207,20 @@ function getCompletionPercentage(qid) {
     // -1 是因为第一行是题目信息
     // /2 是因为每两行组成一个对话（原文和译文）
     const totalDialogs = Math.floor((data.byQid[qid]?.length - 1) / 2);
+    if (totalDialogs <= 0) return 0;
     return Math.min(100, Math.floor((learnedCount / totalDialogs) * 100));
+}
+
+// 计算收听完成度
+function getListeningCompletionPercentage(qid) {
+    if (!isLoggedIn.value) return 0;
+    const qidListened = listeningProgress.value[qid];
+    if (!qidListened) return 0;
+
+    const listenedCount = Object.keys(qidListened).length;
+    const totalDialogs = Math.floor((data.byQid[qid]?.length - 1) / 2);
+    if (totalDialogs <= 0) return 0;
+    return Math.min(100, Math.floor((listenedCount / totalDialogs) * 100));
 }
 
 // 获取所有可用的类型
@@ -262,6 +311,29 @@ const paged = computed(() => {
     return filteredList.value.slice(start, start + per);
 });
 
+const computedPages = computed(() => {
+    const total = pages.value;
+    if (total <= 1) return [];
+    if (total <= 7) return Array.from({length: total}, (_, i) => i + 1);
+
+    const current = cur.value;
+
+    if (current <= 4) {
+        return [1, 2, 3, 4, 5, '...', total];
+    }
+    if (current >= total - 3) {
+        return [1, '...', total - 4, total - 3, total - 2, total - 1, total];
+    }
+    return [1, '...', current - 1, current, current + 1, '...', total];
+});
+
+const prevPage = () => {
+    if (cur.value > 1) cur.value--;
+};
+const nextPage = () => {
+    if (cur.value < pages.value) cur.value++;
+};
+
 // 随机选择一题
 function loadRandomQuestion() {
     const questions = filteredList.value;
@@ -273,13 +345,33 @@ function loadRandomQuestion() {
 }
 
 function toDetail(qid) {
-    selectedQid.value = qid
-    if (props.isWalkmanMode) {
+    if (isWalkmanMode.value) {
+        // 在随身听模式下，分发事件来播放，而不是跳转
         window.dispatchEvent(new CustomEvent('walkman-play-qid', { detail: qid }));
     } else {
         router.push({ name: 'dialog', params: { qid } });
     }
 }
+
+const triggerProgressHighlight = () => {
+    const highlightKey = isWalkmanMode.value ? 'hasSeenListeningHighlight' : 'hasSeenPracticeHighlight';
+
+    if (localStorage.getItem(highlightKey) !== 'true' && filteredList.value.length > 0) {
+        highlightInfo.value = {
+            selector: '.question-item:first-child .right-content',
+            text: isWalkmanMode.value 
+                ? '这里显示的是该题目的【收听完成度】。' 
+                : '这里显示的是该题目的【练习完成度】。'
+        };
+        showProgressHighlight.value = true;
+    }
+};
+
+const closeProgressHighlight = () => {
+    showProgressHighlight.value = false;
+    const key = isWalkmanMode.value ? 'hasSeenListeningHighlight' : 'hasSeenPracticeHighlight';
+    localStorage.setItem(key, 'true');
+};
 </script>
 
 <style scoped>
@@ -358,6 +450,10 @@ function toDetail(qid) {
 
 .question-item {
     margin-bottom: 12px;
+}
+
+.question-item:last-child {
+    border-bottom: none;
 }
 
 .question-content {
@@ -442,7 +538,7 @@ function toDetail(qid) {
 .progress-bar {
     height: 100%;
     border-radius: 4px;
-    transition: width 0.3s ease-in-out, background-color 0.3s ease-in-out;
+    transition: width 0.5s ease-in-out;
 }
 
 .completion-text {
@@ -461,28 +557,56 @@ function toDetail(qid) {
 }
 
 .pagination {
-    margin-top: 32px;
     display: flex;
     justify-content: center;
+    align-items: center;
     gap: 8px;
+    margin-top: 32px;
 }
 
 .page-btn {
-    padding: 8px 12px;
-    border: 1px solid #dee2e6;
-    background: white;
-    border-radius: 4px;
+    min-width: 36px;
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 8px;
+    border: 1px solid #dcdfe6;
+    background: #fff;
+    color: #606266;
     cursor: pointer;
     transition: all 0.2s;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.page-btn:hover {
-    background: #e9ecef;
+.page-btn:hover:not(:disabled) {
+    border-color: #4a90e2;
+    color: #4a90e2;
 }
 
 .page-btn.active {
-    background: #007bff;
-    color: white;
-    border-color: #007bff;
+    background: #4a90e2;
+    color: #fff;
+    border-color: #4a90e2;
+}
+
+.page-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.nav-btn {
+    padding: 0 8px;
+}
+
+.nav-btn .material-icons {
+    font-size: 20px;
+}
+
+.page-ellipsis {
+    color: #888;
+    padding: 0 4px;
+    align-self: flex-end;
 }
 </style>
