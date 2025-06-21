@@ -45,14 +45,21 @@
                     </template>
                 </div>
             </div>
-            <div class="dialog-controls">
-                <button class="circle-btn" @click="playPrevQid" :disabled="!canPrevQid" title="上一题"><span class="material-icons">skip_previous</span></button>
-                <button class="circle-btn" @click="prevDialog" :disabled="currentDialogIndex === 0" title="上一片段"><span class="material-icons">chevron_left</span></button>
-                <button class="circle-btn main-play" @click="togglePlay">
-                    <span class="material-icons" style="font-size:32px;">{{ isPlaying ? 'pause_circle' : 'play_circle' }}</span>
-                </button>
-                <button class="circle-btn" @click="nextDialog" :disabled="currentDialogIndex === currentDialogs.length - 1" title="下一片段"><span class="material-icons">chevron_right</span></button>
-                <button class="circle-btn" @click="playNextQid" :disabled="!canNextQid" title="下一题"><span class="material-icons">skip_next</span></button>
+            <div class="controls-wrapper">
+                <div class="record-container" :class="{ 'spinning': isPlaying }">
+                    <div class="record-label">
+                        <img src="/logo.svg" alt="logo" class="record-logo"/>
+                    </div>
+                </div>
+                <div class="dialog-controls">
+                    <button class="circle-btn" @click="playPrevQid" :disabled="!canPrevQid" title="上一题"><span class="material-icons">skip_previous</span></button>
+                    <button class="circle-btn" @click="prevDialog" :disabled="currentDialogIndex === 0" title="上一片段"><span class="material-icons">chevron_left</span></button>
+                    <button class="circle-btn main-play" @click="togglePlay">
+                        <span class="material-icons" style="font-size:32px;">{{ isPlaying ? 'pause_circle' : 'play_circle' }}</span>
+                    </button>
+                    <button class="circle-btn" @click="nextDialog" :disabled="currentDialogIndex === currentDialogs.length - 1" title="下一片段"><span class="material-icons">chevron_right</span></button>
+                    <button class="circle-btn" @click="playNextQid" :disabled="!canNextQid" title="下一题"><span class="material-icons">skip_next</span></button>
+                </div>
             </div>
         </div>
         <transition name="fade">
@@ -451,14 +458,74 @@ onUnmounted(() => {
   .dialog-text {
     margin-bottom: 10px;
   }
+  .controls-wrapper {
+    display: flex;
+    align-items: center;
+    margin-top: 24px;
+    gap: 32px;
+    padding: 8px 24px 8px 12px;
+    border: 1px solid #e9ecef;
+    border-radius: 50px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .record-container {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background-color: #111;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 6px 15px rgba(0,0,0,0.2), 0 0 0 1px #000;
+    background-image:
+        repeating-radial-gradient(circle at center, rgba(255,255,255,0.04) 0, rgba(255,255,255,0.04) 1px, transparent 1px, transparent 4px),
+        linear-gradient(45deg, #1a1a1a, #0d0d0d);
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .record-container::after {
+    content: '';
+    position: absolute;
+    top: -20px;
+    left: -40px;
+    width: 60px;
+    height: 120px;
+    background: linear-gradient(to right, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.01) 100%);
+    transform: rotate(20deg);
+    pointer-events: none;
+  }
+  .record-label {
+    width: 55px;
+    height: 55px;
+    border-radius: 50%;
+    background: #555;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1;
+    border: 1px solid #777;
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
+  }
+  .record-container.spinning {
+    animation: spin 4s linear infinite;
+  }
+  .record-logo {
+    width: 35px;
+    height: 35px;
+  }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
   .dialog-controls {
     display: flex;
     gap: 32px;
     justify-content: center;
     align-items: center;
-    margin-top: 24px;
     padding-top: 12px;
     padding-bottom: 8px;
+    flex-grow: 1;
   }
   .circle-btn {
     width: 48px;
@@ -621,6 +688,10 @@ onUnmounted(() => {
   }
 
   @media (max-width: 768px) {
+    .record-container {
+      display: none;
+    }
+    
     .player-main {
       padding: 16px;
     }
