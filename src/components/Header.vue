@@ -12,6 +12,9 @@
                 <router-link to="/walkman" class="icon-button" title="随身听">
                     <span class="material-icons">headphones</span>
                 </router-link>
+                <button @click="startGuide" class="icon-button" title="帮助">
+                    <span class="material-icons">help_outline</span>
+                </button>
                 <UserAvatar />
             </div>
         </div>
@@ -20,6 +23,13 @@
 
 <script setup>
 import UserAvatar from './UserAvatar.vue';
+import { useEventBus } from '../services/eventBus.js';
+
+const { emit } = useEventBus();
+
+const startGuide = () => {
+    emit('start-user-guide');
+}
 </script>
 
 <style scoped>

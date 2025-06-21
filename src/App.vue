@@ -16,6 +16,7 @@
     <NotificationBanner @closed="handleNotificationClosed" />
     <Mp3PollModal :show="showMp3Poll" />
     <LoginModal :is-open="isLoginModalOpen" @close="isLoginModalOpen = false" @login-success="isLoginModalOpen = false" />
+    <UserGuide :show="showGuide" :steps="guideSteps" @close="handleGuideClose" />
 </template>
 
 <script setup>
@@ -28,11 +29,33 @@ import NotificationBanner from './components/NotificationBanner.vue';
 import QuestionList from './components/QuestionList.vue';
 import WalkmanPlayer from './components/WalkmanPlayer.vue';
 import LoginModal from './components/LoginModal.vue';
+import UserGuide from './components/UserGuide.vue';
 import { useEventBus } from './services/eventBus.js';
 
 const { on } = useEventBus();
 const showMp3Poll = ref(false);
 const isLoginModalOpen = ref(false);
+const showGuide = ref(false);
+
+const guideSteps = [
+    {
+        selector: '.icon-button[title="题目列表"]',
+        text: '这里是题目列表，您可以点击这里浏览所有的对话题目。'
+    },
+    {
+        selector: '.icon-button[title="随身听"]',
+        text: '这里是随身听模式，开启后可以像听播客一样连续收听所有对话内容。'
+    },
+    {
+        selector: '.user-avatar-container',
+        text: '点击这里可以登录、注册、查看您的个人资料或退出登录。'
+    }
+];
+
+const handleGuideClose = () => {
+    showGuide.value = false;
+    localStorage.setItem('hasSeenUserGuide', 'true');
+};
 
 function handleNotificationClosed() {
     showMp3Poll.value = true;
@@ -44,6 +67,15 @@ const openLoginModal = () => {
 
 onMounted(() => {
     on('open-login-modal', openLoginModal);
+    on('start-user-guide', () => {
+        showGuide.value = true;
+    });
+
+    if (localStorage.getItem('hasSeenUserGuide') !== 'true') {
+        setTimeout(() => {
+            showGuide.value = true;
+        }, 500);
+    }
 });
 
 // Optional: unregister on unmount, though for App.vue it's less critical
