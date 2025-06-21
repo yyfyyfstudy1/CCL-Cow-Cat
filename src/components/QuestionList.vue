@@ -164,7 +164,7 @@ const { on } = useEventBus();
 const learnedDialogs = ref({});
 const listeningProgress = ref({});
 const isLoggedIn = ref(false);
-const walkmanPadding = ref(300)
+const walkmanPadding = ref(400)
 const selectedQid = ref(null)
 
 const showProgressHighlight = ref(false);
@@ -173,7 +173,13 @@ const highlightInfo = ref({ selector: '', text: '' });
 const isWalkmanMode = computed(() => $route.path === '/walkman');
 
 function updatePadding() {
-    walkmanPadding.value = window.isWalkmanCollapsed ? 80 : 300
+    if (window.innerWidth <= 768) {
+        // 移动端 - 进一步增加padding值
+        walkmanPadding.value = window.isWalkmanCollapsed ? 160 : 500
+    } else {
+        // 桌面端
+        walkmanPadding.value = window.isWalkmanCollapsed ? 120 : 400
+    }
 }
 
 const handleProgressUpdate = ({ qid, dialogId }) => {
@@ -200,6 +206,7 @@ onMounted(() => {
     on('listening-progress-updated', handleProgressUpdate);
 
     window.addEventListener('walkman-collapse-change', updatePadding);
+    window.addEventListener('resize', updatePadding);
     updatePadding();
 });
 
@@ -218,6 +225,7 @@ watch(
 
 onUnmounted(() => {
     window.removeEventListener('walkman-collapse-change', updatePadding);
+    window.removeEventListener('resize', updatePadding);
 });
 
 async function loadLearnedDialogs() {
@@ -736,6 +744,7 @@ const closeProgressHighlight = () => {
     align-items: center;
     gap: 8px;
     margin-top: 32px;
+    margin-bottom: 20px;
 }
 
 /* 移动端分页样式 */
@@ -743,6 +752,7 @@ const closeProgressHighlight = () => {
     .pagination {
         gap: 4px;
         margin-top: 24px;
+        margin-bottom: 32px;
         flex-wrap: wrap;
     }
 }
