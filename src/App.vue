@@ -15,10 +15,11 @@
     <Analytics />
     <NotificationBanner @closed="handleNotificationClosed" />
     <Mp3PollModal :show="showMp3Poll" />
+    <LoginModal :is-open="isLoginModalOpen" @close="isLoginModalOpen = false" @login-success="isLoginModalOpen = false" />
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import Header from './components/Header.vue';
 import { Analytics } from '@vercel/analytics/vue';
 import UserAvatar from './components/UserAvatar.vue';
@@ -26,12 +27,29 @@ import Mp3PollModal from './components/Mp3PollModal.vue';
 import NotificationBanner from './components/NotificationBanner.vue';
 import QuestionList from './components/QuestionList.vue';
 import WalkmanPlayer from './components/WalkmanPlayer.vue';
+import LoginModal from './components/LoginModal.vue';
+import { useEventBus } from './services/eventBus.js';
 
+const { on } = useEventBus();
 const showMp3Poll = ref(false);
+const isLoginModalOpen = ref(false);
 
 function handleNotificationClosed() {
     showMp3Poll.value = true;
 }
+
+const openLoginModal = () => {
+    isLoginModalOpen.value = true;
+};
+
+onMounted(() => {
+    on('open-login-modal', openLoginModal);
+});
+
+// Optional: unregister on unmount, though for App.vue it's less critical
+// onUnmounted(() => {
+//   // a way to unregister is needed in eventBus
+// });
 </script>
 
 <style>

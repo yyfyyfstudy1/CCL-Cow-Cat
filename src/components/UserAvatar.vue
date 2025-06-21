@@ -31,13 +31,6 @@
                 </button>
             </template>
         </div>
-
-        <!-- 登录模态框 -->
-        <LoginModal 
-            :is-open="isLoginModalOpen" 
-            @close="closeLoginModal"
-            @login-success="handleLoginSuccess"
-        />
     </div>
 </template>
 
@@ -45,13 +38,13 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth'
 import { useRouter } from 'vue-router'
-import LoginModal from './LoginModal.vue'
+import { useEventBus } from '../services/eventBus.js'
 
+const { emit } = useEventBus()
 const router = useRouter()
 const auth = getAuth()
 const user = ref(null)
 const showDropdown = ref(false)
-const isLoginModalOpen = ref(false)
 const defaultAvatar = '/default-avatar.png'
 const userDefaultAvatar = '/user-default-avatar.png'
 
@@ -91,18 +84,8 @@ onUnmounted(() => {
 
 // 显示登录模态框
 function showLoginModal() {
-    isLoginModalOpen.value = true
+    emit('open-login-modal')
     showDropdown.value = false
-}
-
-// 关闭登录模态框
-function closeLoginModal() {
-    isLoginModalOpen.value = false
-}
-
-// 处理登录成功
-function handleLoginSuccess() {
-    closeLoginModal()
 }
 
 // 处理退出登录
