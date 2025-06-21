@@ -110,6 +110,7 @@
 import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useData } from '../services/useData.js';
+import { useEventBus } from '../services/eventBus.js';
 import FilterPanel from './FilterPanel.vue';
 import { getAllLearned } from '../services/learned.js'
 import { getAllListeningProgress } from '../services/listeningProgress.js'
@@ -141,6 +142,7 @@ watch(filters, () => {
 }, { deep: true });
 
 const { data } = useData();
+const { on } = useEventBus();
 
 const learnedDialogs = ref({});
 const listeningProgress = ref({});
@@ -157,6 +159,13 @@ function updatePadding() {
     walkmanPadding.value = window.isWalkmanCollapsed ? 80 : 300
 }
 
+const handleProgressUpdate = ({ qid, dialogId }) => {
+    if (!listeningProgress.value[qid]) {
+        listeningProgress.value[qid] = {};
+    }
+    listeningProgress.value[qid][dialogId] = true;
+};
+
 onMounted(() => {
     const auth = getAuth();
     onAuthStateChanged(auth, (user) => {
@@ -171,6 +180,8 @@ onMounted(() => {
             listeningProgress.value = {};
         }
     });
+
+    on('listening-progress-updated', handleProgressUpdate);
 
     window.addEventListener('walkman-collapse-change', updatePadding)
     updatePadding()

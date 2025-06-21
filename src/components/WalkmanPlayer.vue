@@ -110,7 +110,9 @@ import { useData } from '../services/useData.js'
 import { getAuth, onAuthStateChanged } from "firebase/auth"
 import { getPlayerSettings, savePlayerSettings } from "../services/userSettings.js"
 import { markAsListened } from '../services/listeningProgress.js'
+import { useEventBus } from '../services/eventBus.js';
 
+const { emit: emitEvent } = useEventBus();
 const props = defineProps({
   qidList: { type: Array, default: () => [] },
   currentQid: { type: String, default: '' }
@@ -239,6 +241,11 @@ const onTransAudioEnded = () => {
     // 标记为已收听
     if (currentDialog.value.qid && currentDialog.value.original?.id) {
         markAsListened(currentDialog.value.qid, currentDialog.value.original.id);
+        // 发送事件通知列表更新
+        emitEvent('listening-progress-updated', { 
+            qid: currentDialog.value.qid, 
+            dialogId: currentDialog.value.original.id 
+        });
     }
 
     // 片段重复次数已满，继续原有逻辑
