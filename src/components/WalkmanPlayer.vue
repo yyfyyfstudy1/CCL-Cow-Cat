@@ -557,4 +557,54 @@ function onAudioError(type) {
     color: #1976d2;
     box-shadow: 0 4px 16px rgba(25,118,210,0.10);
   }
+
+  @media (max-width: 768px) {
+    .player-main {
+      padding: 16px;
+    }
+
+    .dialog-header {
+      font-size: 16px;
+      padding-right: 40px; /* 为设置按钮留出空间 */
+      padding-left: 40px;  /* 为折叠按钮留出空间 */
+    }
+
+    .dialog-controls {
+      gap: 12px;
+      padding-top: 16px;
+      padding-bottom: 12px;
+    }
+
+    .circle-btn {
+      width: 44px;
+      height: 44px;
+      font-size: 22px;
+    }
+
+    .main-play {
+      width: 56px;
+      height: 56px;
+      margin: 0 4px;
+    }
+    
+    .main-play .material-icons {
+      font-size: 32px !important;
+    }
+
+    .settings-btn {
+      width: 36px;
+      height: 36px;
+      font-size: 22px;
+      right: 16px;
+      top: 14px;
+    }
+
+    .collapse-btn {
+      width: 36px;
+      height: 36px;
+      font-size: 22px;
+      left: 16px;
+      top: 14px;
+    }
+  }
   </style>
