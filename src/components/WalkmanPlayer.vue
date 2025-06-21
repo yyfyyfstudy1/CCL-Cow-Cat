@@ -6,13 +6,13 @@
             </button>
             <div v-show="!isCollapsed">
                 <div class="dialog-header">
-                    <span v-if="currentQid" class="qid-span">{{ currentQid }}</span>
+                    <span v-if="props.currentQid" class="qid-span">{{ props.currentQid }}</span>
                     <span class="title-span">{{ currentQidTitle }}</span>
                     <span style="margin-left:16px;">{{ currentDialogIndex + 1 }}/{{ currentDialogs.length }}</span>
                     <button class="settings-btn" @click="showSettings = true" title="设置"><span class="material-icons">settings</span></button>
                 </div>
                 <div class="dialog-content">
-                    <template v-if="!currentQid">
+                    <template v-if="!props.currentQid">
                         <div class="select-qid-tip">请选择任意题目播放</div>
                     </template>
                     <template v-else>
@@ -105,8 +105,10 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useData } from '../services/useData.js'
+import { getAuth, onAuthStateChanged } from "firebase/auth"
+import { getPlayerSettings, savePlayerSettings } from "../services/userSettings.js"
 
 const props = defineProps({
   qidList: { type: Array, default: () => [] },
@@ -115,140 +117,133 @@ const props = defineProps({
 
 const emit = defineEmits(['update:currentQid'])
 
-/* ---------- 用户可调参数 ---------- */
-const autoNext      = ref(false)  // 默认关闭自动跳转
-const segmentGap    = ref(3)
+/* ---------- 用户可调参数 (Settings) ---------- */
+const autoNext      = ref(true)
+const segmentGap    = ref(1.5)
 const dialogGap     = ref(3)
-const playbackRate  = ref(1)
-const maxContinuous = ref(50)
+const playbackRate  = ref(1.0)
+const maxContinuous = ref(3)
 const repeatCount   = ref(1)
-/* ---------------------------------- */
+/* ------------------------------------------- */
 
-/* -------------- 状态 -------------- */
-const { data }           = useData()
-const currentQid         = ref(null)
+/* -------------- 内部状态 (Internal State) -------------- */
+const { data, loadExcel } = useData()
 const currentDialogs     = ref([])
 const currentDialogIndex = ref(0)
-
-const isPlaying      = ref(false)   // 播放按钮状态
-const isTransPlaying = ref(false)   // 是否在播译文
-const audioRef       = ref(null)    // 原文 audio DOM
-const transAudioRef  = ref(null)    // 译文 audio DOM
+const isPlaying      = ref(false)
+const isTransPlaying = ref(false)
+const audioRef       = ref(null)
+const transAudioRef  = ref(null)
 const autoPlayTimer  = ref(null)
 const showSettings   = ref(false)
 const repeatTimes    = ref(0)
 const isCollapsed    = ref(false)
-/* ---------------------------------- */
+const continuousPlayCount = ref(0)
+/* ---------------------------------------------------- */
 
-/* -------------- 常量 -------------- */
+/* -------------- 常量 (Constants) -------------- */
 const S3_BASE_URL   = 'https://cclcowcatresource.s3.ap-southeast-2.amazonaws.com'
 const S3_AUDIO_PATH = import.meta.env.VITE_S3_AUDIO_PATH || '/audio/'
-/* ---------------------------------- */
+/* --------------------------------------------- */
 
-/* ---------- 计算属性 ---------- */
+/* ---------- 计算属性 (Computed) ---------- */
 const allQids = computed(() => props.qidList && props.qidList.length ? props.qidList : Object.keys(data.byQid));
-const currentQidValue = computed(() => props.currentQid || currentQid.value);
-const currentQidIndex = computed(() => allQids.value.indexOf(currentQidValue.value));
+const currentQidIndex = computed(() => allQids.value.indexOf(props.currentQid));
 const canNextQid = computed(() => currentQidIndex.value !== -1 && currentQidIndex.value < allQids.value.length - 1);
 const canPrevQid = computed(() => currentQidIndex.value > 0);
 const currentDialog     = computed(() => currentDialogs.value[currentDialogIndex.value] || {})
 const currentQidTitle   = computed(() => {
-    if (!currentQidValue.value) return ''
-    const rows = data.byQid[currentQidValue.value]
+    if (!props.currentQid) return ''
+    const rows = data.byQid[props.currentQid]
     return rows && rows[0] ? rows[0].title : ''
 })
-/* -------------------------------- */
+/* ------------------------------------------ */
 
-/* ---------- 辅助函数 ---------- */
-function audioSrc(rel) {
-    return rel ? `${S3_BASE_URL}${S3_AUDIO_PATH}${rel}` : ''
-}
+/* ---------- 辅助函数 (Helpers) ---------- */
+const audioSrc = (rel) => rel ? `${S3_BASE_URL}${S3_AUDIO_PATH}${rel}` : '';
 
-// **一次性暂停页面内所有 <audio> 元素**
-function pauseAllAudios(reset = false) {
+const pauseAllAudios = (reset = false) => {
     document.querySelectorAll('audio').forEach(a => {
         a.pause()
         if (reset) a.currentTime = 0
     })
 }
-/* -------------------------------- */
 
-/* ============== 核心控制 ============== */
-function stopAudio() {
-    pauseAllAudios(true)           // 1. 全面停止
-    if (autoPlayTimer.value) {     // 2. 清计时器
+const debounce = (fn, delay) => {
+    let timeoutId;
+    return (...args) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => fn(...args), delay);
+    };
+}
+
+const updatePadding = (reset = false) => {
+    const playerContainer = document.querySelector('.walkman-player-wrapper');
+    const content = document.querySelector('.content-container');
+    if (playerContainer && content) {
+        if (reset) {
+            content.style.paddingBottom = '0';
+        } else {
+            const height = playerContainer.offsetHeight;
+            content.style.paddingBottom = `${height}px`;
+        }
+    }
+}
+/* --------------------------------------- */
+
+/* ============== 核心控制 (Core Controls) ============== */
+const stopAudio = () => {
+    pauseAllAudios(true)
+    if (autoPlayTimer.value) {
         clearTimeout(autoPlayTimer.value)
         autoPlayTimer.value = null
     }
-    isPlaying.value      = false   // 3. 状态复位
+    isPlaying.value      = false
     isTransPlaying.value = false
 }
 
-function onAudioEnded() {
-    // 原文音频播完后自动播放译文
+const onAudioEnded = () => {
     if (transAudioRef.value) {
         isTransPlaying.value = true
         transAudioRef.value.currentTime = 0
         transAudioRef.value.playbackRate = Number(playbackRate.value)
-        transAudioRef.value.play().catch(err => {
-            if (import.meta.env.DEV) {
-                console.warn('[Walkman] 译文播放失败', err)
-            }
-        })
+        transAudioRef.value.play().catch(err => console.warn('[Walkman] 译文播放失败', err))
     } else {
-        // 没有译文音频，直接结束
         isPlaying.value = false
         isTransPlaying.value = false
     }
 }
 
-// 新增 replayCurrentAudio 只重播当前片段
-function replayCurrentAudio() {
+const replayCurrentAudio = () => {
     isPlaying.value = true
     isTransPlaying.value = false
     nextTick(() => {
         if (audioRef.value) {
             audioRef.value.currentTime  = 0
             audioRef.value.playbackRate = Number(playbackRate.value)
-            audioRef.value.play().catch(err => {
-                if (import.meta.env.DEV) {
-                    console.warn('[Walkman] 原文播放失败', err)
-                }
-            })
+            audioRef.value.play().catch(err => console.warn('[Walkman] 原文播放失败', err))
         }
     })
 }
 
-// 修改 onTransAudioEnded
-function onTransAudioEnded() {
+const onTransAudioEnded = () => {
     isTransPlaying.value = false
     isPlaying.value = false
     repeatTimes.value++
     if (repeatTimes.value < repeatCount.value) {
-        // 只重播当前片段，不重置计数
-        setTimeout(() => {
-            replayCurrentAudio()
-        }, segmentGap.value * 1000)
+        setTimeout(() => replayCurrentAudio(), segmentGap.value * 1000)
         return
     }
-    // 片段重复次数已满，继续原有逻辑
     repeatTimes.value = 0
     if (currentDialogIndex.value < currentDialogs.value.length - 1) {
-        autoPlayTimer.value = setTimeout(() => {
-            nextDialog()
-        }, segmentGap.value * 1000)
-    } else {
-        if (autoNext.value) {
-            autoPlayTimer.value = setTimeout(() => {
-                playNextQid()
-            }, dialogGap.value * 1000)
-        }
+        autoPlayTimer.value = setTimeout(nextDialog, segmentGap.value * 1000)
+    } else if (autoNext.value) {
+        autoPlayTimer.value = setTimeout(playNextQid, dialogGap.value * 1000)
     }
 }
 
-// 修改 playCurrent，重置 repeatTimes
-function playCurrent() {
-    stopAudio()                    // 确保没有遗漏音频
+const playCurrent = () => {
+    stopAudio()
     isPlaying.value = true
     isTransPlaying.value = false
     repeatTimes.value = 0
@@ -256,49 +251,42 @@ function playCurrent() {
         if (audioRef.value) {
             audioRef.value.currentTime  = 0
             audioRef.value.playbackRate = Number(playbackRate.value)
-            audioRef.value.play().catch(err => {
-                if (import.meta.env.DEV) {
-                    console.warn('[Walkman] 原文播放失败', err)
-                }
-            })
+            audioRef.value.play().catch(err => console.warn('[Walkman] 原文播放失败', err))
         }
     })
 }
 
-function pauseCurrent() {
+const pauseCurrent = () => {
     isPlaying.value = false
-    pauseAllAudios()               // 只暂停，不复位进度
+    pauseAllAudios()
     if (autoPlayTimer.value) {
         clearTimeout(autoPlayTimer.value)
         autoPlayTimer.value = null
     }
 }
 
-function playNextQid() {
-    const idx = allQids.value.indexOf(currentQidValue.value)
-    if (idx !== -1 && idx < allQids.value.length - 1) {
-        handlePlayQid(allQids.value[idx + 1])
+const playNextQid = () => {
+    if (canNextQid.value) {
+        handlePlayQid(allQids.value[currentQidIndex.value + 1])
     } else {
         stopAudio()
     }
 }
 
-function playPrevQid() {
-    const idx = allQids.value.indexOf(currentQidValue.value)
-    if (idx > 0) {
-        handlePlayQid(allQids.value[idx - 1])
+const playPrevQid = () => {
+    if (canPrevQid.value) {
+        handlePlayQid(allQids.value[currentQidIndex.value - 1])
     } else {
         stopAudio()
     }
 }
-/* ===================================== */
+/* ======================================================= */
 
-/* ----------- 组件事件 & 生命周期 ----------- */
-function handlePlayQid(qid) {
+/* ----------- 事件处理 & 生命周期 (Events & Lifecycle) ----------- */
+const handlePlayQid = (qid) => {
     stopAudio()
-    currentQid.value = qid
     emit('update:currentQid', qid)
-    const rows    = data.byQid[qid] || []
+    const rows = data.byQid[qid] || []
     const dialogs = []
     for (let i = 1; i < rows.length; i += 2) {
         const o = rows[i], t = rows[i + 1]
@@ -315,48 +303,107 @@ function handlePlayQid(qid) {
     nextTick(playCurrent)
 }
 
-function onPlayQidEvent(e) {
-    handlePlayQid(e.detail)
+const onPlayQidEvent = (e) => handlePlayQid(e.detail)
+
+const onAudioError = (type) => () => {
+    console.error(`[Walkman] ${type}音频加载失败`, {
+        src: type === '原文' ? audioSrc(currentDialog.value.original?.audio) : audioSrc(currentDialog.value.translation?.audio),
+        dialog: currentDialog.value,
+    })
+    alert(`${type}音频加载失败，请检查文件路径或格式`)
 }
 
-onMounted(() => {
-    console.log('[Walkman] mounted', Date.now())
-    window.addEventListener('walkman-play-qid', onPlayQidEvent)
-})
-onUnmounted(() => window.removeEventListener('walkman-play-qid', onPlayQidEvent))
-/* ------------------------------------------ */
+/* ------------------------------------------------------------- */
 
-/* -------------- 控制按钮 -------------- */
-function togglePlay() {
-    isPlaying.value ? pauseCurrent() : playCurrent()
-}
+/* ----------- 设置同步 (Settings Sync) ----------- */
+const debouncedSaveSettings = debounce(() => {
+    const settings = {
+        autoNext: autoNext.value,
+        segmentGap: segmentGap.value,
+        dialogGap: dialogGap.value,
+        playbackRate: playbackRate.value,
+        maxContinuous: maxContinuous.value,
+        repeatCount: repeatCount.value,
+        isCollapsed: isCollapsed.value,
+    };
+    savePlayerSettings(settings);
+}, 1000);
 
-function prevDialog() {
+watch(
+    [autoNext, segmentGap, dialogGap, playbackRate, maxContinuous, repeatCount, isCollapsed],
+    debouncedSaveSettings,
+    { deep: true }
+);
+
+const loadUserSettings = async () => {
+    const settings = await getPlayerSettings();
+    if (settings) {
+        autoNext.value = settings.autoNext ?? autoNext.value;
+        segmentGap.value = settings.segmentGap ?? segmentGap.value;
+        dialogGap.value = settings.dialogGap ?? dialogGap.value;
+        playbackRate.value = settings.playbackRate ?? playbackRate.value;
+        maxContinuous.value = settings.maxContinuous ?? maxContinuous.value;
+        repeatCount.value = settings.repeatCount ?? repeatCount.value;
+        isCollapsed.value = settings.isCollapsed ?? isCollapsed.value;
+    }
+};
+/* --------------------------------------------- */
+
+
+/* -------------- 控制按钮 (Control Buttons) -------------- */
+const togglePlay = () => isPlaying.value ? pauseCurrent() : playCurrent()
+
+const prevDialog = () => {
     if (currentDialogIndex.value === 0) return
     stopAudio()
     currentDialogIndex.value--
     playCurrent()
 }
 
-function nextDialog() {
+const nextDialog = () => {
     if (currentDialogIndex.value === currentDialogs.value.length - 1) return
     stopAudio()
     currentDialogIndex.value++
     playCurrent()
 }
-/* ------------------------------------- */
+/* ---------------------------------------------------- */
 
-/* ----------- 统一错误提示 ----------- */
-function onAudioError(type) {
-    return () => {
-        console.error(`[Walkman] ${type}音频加载失败`, {
-            src: type === '原文' ? audioSrc(currentDialog.value.original?.audio) : audioSrc(currentDialog.value.translation?.audio),
-            dialog: currentDialog.value,
-        })
-        alert(`${type}音频加载失败，请检查文件路径或格式`)
+
+/* -------------- Lifecycle Hooks -------------- */
+let resizeObserver = null;
+
+onMounted(() => {
+    console.log('[Walkman] mounted');
+    window.addEventListener('walkman-play-qid', onPlayQidEvent);
+    
+    if (!data.loaded) {
+        loadExcel();
     }
-}
-/* ----------------------------------- */
+
+    const auth = getAuth();
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            loadUserSettings();
+        }
+    });
+
+    const playerContainer = document.querySelector('.walkman-player-wrapper');
+    if (playerContainer) {
+        updatePadding();
+        resizeObserver = new ResizeObserver(() => updatePadding());
+        resizeObserver.observe(playerContainer);
+    }
+});
+
+onUnmounted(() => {
+    window.removeEventListener('walkman-play-qid', onPlayQidEvent);
+    if (resizeObserver) {
+        resizeObserver.disconnect();
+    }
+    updatePadding(true); // Restore padding on unmount
+});
+/* --------------------------------------------- */
+
 </script>
 
   <style scoped>
