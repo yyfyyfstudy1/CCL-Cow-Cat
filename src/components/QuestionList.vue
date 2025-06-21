@@ -166,6 +166,7 @@ const handleProgressUpdate = ({ qid, dialogId }) => {
     listeningProgress.value[qid][dialogId] = true;
 };
 
+// 监听登录状态和路由变化
 onMounted(() => {
     const auth = getAuth();
     onAuthStateChanged(auth, (user) => {
@@ -173,8 +174,6 @@ onMounted(() => {
         if (user) {
             loadLearnedDialogs();
             loadListeningProgress();
-            // 延迟触发，确保DOM渲染完毕
-            setTimeout(triggerProgressHighlight, 1000);
         } else {
             learnedDialogs.value = {};
             listeningProgress.value = {};
@@ -183,12 +182,26 @@ onMounted(() => {
 
     on('listening-progress-updated', handleProgressUpdate);
 
-    window.addEventListener('walkman-collapse-change', updatePadding)
-    updatePadding()
-})
+    window.addEventListener('walkman-collapse-change', updatePadding);
+    updatePadding();
+});
+
+// 监听路由、登录状态、数据加载状态的变化，以触发高亮
+watch(
+    [() => $route.path, isLoggedIn, () => data.loaded],
+    ([path, loggedIn, dataLoaded]) => {
+        if (loggedIn && dataLoaded) {
+            window.scrollTo(0, 0); // 强制滚动到页面顶部
+            // 延迟触发，确保DOM渲染完毕
+            setTimeout(triggerProgressHighlight, 500);
+        }
+    },
+    { immediate: true }
+);
+
 onUnmounted(() => {
-    window.removeEventListener('walkman-collapse-change', updatePadding)
-})
+    window.removeEventListener('walkman-collapse-change', updatePadding);
+});
 
 async function loadLearnedDialogs() {
     try {
