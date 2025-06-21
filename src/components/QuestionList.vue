@@ -95,7 +95,7 @@
 
         <!-- WalkmanPlayer 只在 isWalkmanMode 下显示 -->
         <WalkmanPlayer v-if="isWalkmanMode" :qid-list="paged.map(q => q.qid)" v-model:currentQid="selectedQid" />
-        
+
         <!-- 功能高亮提示 -->
         <FeatureHighlight
             :show="showProgressHighlight"
@@ -383,9 +383,9 @@ const triggerProgressHighlight = () => {
     if (localStorage.getItem(highlightKey) !== 'true' && filteredList.value.length > 0) {
         highlightInfo.value = {
             selector: '.question-item:first-child .right-content',
-            text: isWalkmanMode.value 
-                ? '这里显示的是该题目的【收听完成度】。' 
-                : '这里显示的是该题目的【练习完成度】。'
+            text: isWalkmanMode.value
+                ? '这里显示的是该题目的【收听完成度】'
+                : '这里显示的是该题目的【练习完成度】'
         };
         showProgressHighlight.value = true;
     }

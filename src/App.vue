@@ -8,11 +8,12 @@
         </main>
     </div>
     <Analytics />
-    <NotificationBanner @closed="handleNotificationClosed" />
+    <NotificationBanner v-if="showBanner" @closed="handleNotificationClosed" />
     <Mp3PollModal :show="showMp3Poll" />
     <LoginModal :is-open="isLoginModalOpen" @close="isLoginModalOpen = false" @login-success="isLoginModalOpen = false" />
     <UserGuide :show="showGuide" :steps="guideSteps" @close="handleGuideClose" />
     <FeedbackModal :show="showFeedbackModal" @close="showFeedbackModal = false" />
+    <VersionChecker />
 </template>
 
 <script setup>
@@ -25,6 +26,7 @@ import NotificationBanner from './components/NotificationBanner.vue';
 import LoginModal from './components/LoginModal.vue';
 import UserGuide from './components/UserGuide.vue';
 import FeedbackModal from './components/FeedbackModal.vue';
+import VersionChecker from './components/VersionChecker.vue';
 import { useEventBus } from './services/eventBus.js';
 import { useData } from './services/useData.js';
 
@@ -36,32 +38,38 @@ const isLoginModalOpen = ref(false);
 const showGuide = ref(false);
 const showFeedbackModal = ref(false);
 
+const isMobile = ref(window.innerWidth < 768);
+const showBanner = ref(true); // Default to true for desktop
+
 const guideSteps = [
     {
         selector: '.icon-button[title="题目列表"]',
-        text: '这里是题目列表，您可以点击这里浏览所有的对话题目。'
+        text: '这里是题目列表，可以点击这里浏览所有的对话题目'
     },
     {
         selector: '.icon-button[title="随身听"]',
-        text: '这里是随身听模式，开启后可以像听播客一样连续收听所有对话内容。'
+        text: '这里是随身听模式，开启后可以像听播客一样连续收听所有对话内容'
     },
     {
         selector: '.icon-button[title="反馈"]',
-        text: '如果您有任何意见或建议，可以点击这里告诉我们。'
+        text: '如果有任何建议或者使用上的问题，可以点击这里告诉我'
     },
     {
         selector: '.user-avatar-container',
-        text: '点击这里可以登录、注册、查看您的个人资料或退出登录。'
+        text: '点击这里可以登录、注册、查看你的个人收藏'
     }
 ];
 
 const handleGuideClose = () => {
     showGuide.value = false;
     localStorage.setItem('hasSeenUserGuide', 'true');
+    if (isMobile.value) {
+        showBanner.value = true; // Show banner after guide is closed on mobile
+    }
 };
 
 function handleNotificationClosed() {
-    showMp3Poll.value = true;
+    // showMp3Poll.value = true; // 暂时禁用问卷调查
 }
 
 const openLoginModal = () => {
@@ -69,6 +77,16 @@ const openLoginModal = () => {
 };
 
 onMounted(() => {
+    const onResize = () => isMobile.value = window.innerWidth < 768;
+    window.addEventListener('resize', onResize);
+    onUnmounted(() => window.removeEventListener('resize', onResize));
+
+    const hasSeenGuide = localStorage.getItem('hasSeenUserGuide') === 'true';
+
+    if (isMobile.value && !hasSeenGuide) {
+        showBanner.value = false; // Hide banner initially on mobile first visit
+    }
+
     loadExcel();
     on('open-login-modal', openLoginModal);
     on('start-user-guide', () => {
@@ -78,7 +96,7 @@ onMounted(() => {
         showFeedbackModal.value = true;
     });
 
-    if (localStorage.getItem('hasSeenUserGuide') !== 'true') {
+    if (!hasSeenGuide) {
         setTimeout(() => {
             showGuide.value = true;
         }, 500);

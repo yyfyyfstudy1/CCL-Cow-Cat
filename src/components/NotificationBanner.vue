@@ -1,7 +1,7 @@
 <template>
     <div v-if="showNotification" class="notification">
         <div class="notification-content">
-            <p>备考期间突然发现还是要有个人错题集功能，所以就加上了。大家可以随意注册一下登录使用，也可以不登录，其他都没变。有几个哥们儿强烈想要MP3功能，决定让大家投个票，如果大部分人觉得需要后面我就加上吧。。</p>
+            <p>还有其他想要的功能可以反馈给我（但我不一定有空做 🐒🐒🐒）。移动端的部分布局暂时没空做适配了，大家可以选择的话还是在电脑上使用更好</p>
             <button @click="closeNotification" class="notification-close">知道了</button>
         </div>
     </div>
@@ -72,4 +72,4 @@ function closeNotification() {
 .notification-close:hover {
     background: #1565c0;
 }
-</style> 
+</style>

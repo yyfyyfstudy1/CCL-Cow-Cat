@@ -67,12 +67,14 @@
                     <h3>已听对话</h3>
                 </div>
                 <div class="stat-content">
-                    <div class="empty-state">
+                    <div v-if="listenedDialogCount === 0" class="empty-state">
                         <span class="material-icons">headphones</span>
                         <p>暂无已听对话</p>
                     </div>
+                    <div v-else class="stats-display">
+                        <p class="stat-value">{{ listenedDialogCount }}</p>
+                    </div>
                 </div>
-                <div class="overlay"><span class="overlay-text">功能未上线</span></div>
             </div>
 
        
@@ -87,6 +89,7 @@ import { ref, onMounted } from 'vue';
 import { getAuth } from 'firebase/auth';
 import { getAllFavorites } from '../services/favorites';
 import { getAllLearned } from '../services/learned.js';
+import { getAllListeningProgress } from '../services/listeningProgress.js';
 import { useRouter } from 'vue-router';
 import { db } from '../services/firebase';
 import { collection, getDocs } from 'firebase/firestore';
@@ -94,62 +97,71 @@ import { collection, getDocs } from 'firebase/firestore';
 const userEmail = ref('');
 const favoriteIds = ref([]);
 const learnedDialogCount = ref(0);
+const listenedDialogCount = ref(0);
 const notesCount = ref(0);
 const router = useRouter();
 
-onMounted(() => {
+onMounted(async () => {
     const auth = getAuth();
     const user = auth.currentUser;
-    if (user) {
-        userEmail.value = user.email;
-    }
-});
+    if (!user) return;
 
-onMounted(async () => {
-    try {
-        favoriteIds.value = await getAllFavorites();
-    } catch (e) {
-        console.error("加载收藏失败:", e);
-        favoriteIds.value = [];
-    }
-});
+    userEmail.value = user.email;
 
-onMounted(async () => {
+    // Fetch all data in parallel
     try {
-        const allLearned = await getAllLearned();
+        const [favorites, allLearned, allListened, notes] = await Promise.all([
+            getAllFavorites(),
+            getAllLearned(),
+            getAllListeningProgress(),
+            fetchNotes(user.uid)
+        ]);
+
+        favoriteIds.value = favorites;
+
         let totalLearned = 0;
         for (const qid in allLearned) {
             totalLearned += Object.keys(allLearned[qid]).length;
         }
         learnedDialogCount.value = totalLearned;
-    } catch (e) {
-        console.error("加载已学对话失败:", e);
-        learnedDialogCount.value = 0;
-    }
-});
 
-onMounted(async () => {
-    const auth = getAuth();
-    const user = auth.currentUser;
-
-    if (user) {
-        try {
-            let totalNotes = 0;
-            const dialogsColRef = collection(db, 'users', user.uid, 'dialogs');
-            const dialogsSnapshot = await getDocs(dialogsColRef);
-
-            for (const dialogDoc of dialogsSnapshot.docs) {
-                const notesColRef = collection(db, 'users', user.uid, 'dialogs', dialogDoc.id, 'notes');
-                const notesSnapshot = await getDocs(notesColRef);
-                totalNotes += notesSnapshot.docs.length;
-            }
-            notesCount.value = totalNotes;
-        } catch (e) {
-            console.error("加载笔记总数失败:", e);
-            notesCount.value = 0;
+        let totalListened = 0;
+        for (const qid in allListened) {
+            totalListened += Object.keys(allListened[qid]).length;
         }
+        listenedDialogCount.value = totalListened;
+
+        notesCount.value = notes;
+
+    } catch (e) {
+        console.error("加载个人资料数据失败:", e);
+        // Optionally set all counts to 0 or show an error state
+        favoriteIds.value = [];
+        learnedDialogCount.value = 0;
+        listenedDialogCount.value = 0;
+        notesCount.value = 0;
     }
 });
+
+
+async function fetchNotes(uid) {
+    try {
+        let totalNotes = 0;
+        const dialogsColRef = collection(db, 'users', uid, 'dialogs');
+        const dialogsSnapshot = await getDocs(dialogsColRef);
+
+        for (const dialogDoc of dialogsSnapshot.docs) {
+            const notesColRef = collection(db, 'users', uid, 'dialogs', dialogDoc.id, 'notes');
+            const notesSnapshot = await getDocs(notesColRef);
+            totalNotes += notesSnapshot.docs.length;
+        }
+        return totalNotes;
+    } catch (e) {
+        console.error("加载笔记总数失败:", e);
+        return 0; // Return 0 on error
+    }
+}
+
 
 function goToFavorites() {
     router.push('/my-favorites');
