@@ -1,6 +1,6 @@
 <template>
     <div class="container">
-        <a class="back" @click="$router.back()">← 返回</a>
+        <a class="back" @click="handleBack">← 返回</a>
 
         <div v-if="error" class="error">
             <h3>加载失败</h3>
@@ -312,7 +312,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useData } from '../services/useData.js'
 import { checkTranslation, transcribeAudio } from '../services/openai.js'
 import { addFavorite, removeFavorite, getAllFavorites } from '../services/favorites.js'
@@ -322,6 +322,7 @@ import { getAuth, onAuthStateChanged } from 'firebase/auth' // 导入 Firebase A
 import { uploadAudioToLambda } from '@/services/googleDrive'
 
 const route = useRoute()
+const router = useRouter()
 const qid = route.params.qid
 
 // 状态
@@ -1142,6 +1143,25 @@ const transcribingStatus = ref('idle') // 'idle' | 'transcribing' | 'scoring' | 
 const currentTranscribingDialogId = ref(null)
 const recordError = ref('')
 const showRecordError = ref(false)
+
+function handleBack() {
+    // 检查是否有保存的状态需要传递回去
+    const savedState = {
+        page: route.query.page,
+        filters: route.query.filters
+    };
+    
+    // 如果有保存的状态，返回到QuestionList并传递状态
+    if (savedState.page || savedState.filters) {
+        router.push({ 
+            path: '/', 
+            query: savedState
+        });
+    } else {
+        // 没有保存的状态，使用默认的返回行为
+        router.back();
+    }
+}
 </script>
 
 <style scoped>

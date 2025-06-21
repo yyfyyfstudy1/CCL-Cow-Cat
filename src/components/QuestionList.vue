@@ -138,8 +138,25 @@ const filters = ref({
 
 // 监听筛选条件变化，重置页码
 watch(filters, () => {
-    cur.value = 1;
+    // 只有在没有保存状态时才重置页码
+    if (!$route.query.page) {
+        cur.value = 1;
+    }
 }, { deep: true });
+
+// 监听路由参数变化，恢复状态
+watch(() => $route.query, (newQuery) => {
+    if (newQuery.page) {
+        cur.value = parseInt(newQuery.page);
+    }
+    if (newQuery.filters) {
+        try {
+            filters.value = JSON.parse(newQuery.filters);
+        } catch (e) {
+            console.error('解析筛选条件失败:', e);
+        }
+    }
+}, { immediate: true });
 
 const { data } = useData();
 const { on } = useEventBus();
@@ -373,7 +390,16 @@ function toDetail(qid) {
         // 在随身听模式下，分发事件来播放，而不是跳转
         window.dispatchEvent(new CustomEvent('walkman-play-qid', { detail: qid }));
     } else {
-        router.push({ name: 'dialog', params: { qid } });
+        // 保存当前状态到路由参数
+        const state = {
+            page: cur.value,
+            filters: JSON.stringify(filters.value)
+        };
+        router.push({ 
+            name: 'dialog', 
+            params: { qid },
+            query: state
+        });
     }
 }
 
