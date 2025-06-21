@@ -17,6 +17,7 @@
     <Mp3PollModal :show="showMp3Poll" />
     <LoginModal :is-open="isLoginModalOpen" @close="isLoginModalOpen = false" @login-success="isLoginModalOpen = false" />
     <UserGuide :show="showGuide" :steps="guideSteps" @close="handleGuideClose" />
+    <FeedbackModal :show="showFeedbackModal" @close="showFeedbackModal = false" />
 </template>
 
 <script setup>
@@ -30,12 +31,14 @@ import QuestionList from './components/QuestionList.vue';
 import WalkmanPlayer from './components/WalkmanPlayer.vue';
 import LoginModal from './components/LoginModal.vue';
 import UserGuide from './components/UserGuide.vue';
+import FeedbackModal from './components/FeedbackModal.vue';
 import { useEventBus } from './services/eventBus.js';
 
 const { on } = useEventBus();
 const showMp3Poll = ref(false);
 const isLoginModalOpen = ref(false);
 const showGuide = ref(false);
+const showFeedbackModal = ref(false);
 
 const guideSteps = [
     {
@@ -45,6 +48,10 @@ const guideSteps = [
     {
         selector: '.icon-button[title="随身听"]',
         text: '这里是随身听模式，开启后可以像听播客一样连续收听所有对话内容。'
+    },
+    {
+        selector: '.icon-button[title="反馈"]',
+        text: '如果您有任何意见或建议，可以点击这里告诉我们。'
     },
     {
         selector: '.user-avatar-container',
@@ -69,6 +76,9 @@ onMounted(() => {
     on('open-login-modal', openLoginModal);
     on('start-user-guide', () => {
         showGuide.value = true;
+    });
+    on('open-feedback-modal', () => {
+        showFeedbackModal.value = true;
     });
 
     if (localStorage.getItem('hasSeenUserGuide') !== 'true') {

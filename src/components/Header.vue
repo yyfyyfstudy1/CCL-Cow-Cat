@@ -6,14 +6,17 @@
                 <span class="site-title">CCL奶牛猫</span>
             </router-link>
             <div class="header-right-icons">
+                <button @click="startGuide" class="icon-button" title="帮助">
+                    <span class="material-icons">help_outline</span>
+                </button>
                 <router-link to="/" class="icon-button" title="题目列表">
                     <span class="material-icons">menu_book</span>
                 </router-link>
                 <router-link to="/walkman" class="icon-button" title="随身听">
                     <span class="material-icons">headphones</span>
                 </router-link>
-                <button @click="startGuide" class="icon-button" title="帮助">
-                    <span class="material-icons">help_outline</span>
+                <button @click="openFeedback" class="icon-button" title="反馈">
+                    <span class="material-icons">campaign</span>
                 </button>
                 <UserAvatar />
             </div>
@@ -29,6 +32,10 @@ const { emit } = useEventBus();
 
 const startGuide = () => {
     emit('start-user-guide');
+}
+
+const openFeedback = () => {
+    emit('open-feedback-modal');
 }
 </script>
 
@@ -101,5 +108,11 @@ const startGuide = () => {
 
 .icon-button .material-icons {
     font-size: 28px; /* 调整图标大小，使其在40px容器中更协调 */
+}
+
+@media (max-width: 768px) {
+    .site-title {
+        display: none;
+    }
 }
 </style>
