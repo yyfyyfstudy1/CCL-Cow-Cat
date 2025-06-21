@@ -1,9 +1,13 @@
 <template>
     <div class="walkman-player-wrapper" :class="{ expanded: showSettings }">
-        <div class="player-main">
-            <button class="collapse-btn" @click="isCollapsed = !isCollapsed" :title="isCollapsed ? '展开' : '折叠'">
+        <!-- 折叠/展开指示器 -->
+        <div class="collapse-indicator" @click="isCollapsed = !isCollapsed" :title="isCollapsed ? '展开播放器' : '折叠播放器'">
+            <div class="indicator-content">
                 <span class="material-icons">{{ isCollapsed ? 'expand_less' : 'expand_more' }}</span>
-            </button>
+            </div>
+        </div>
+
+        <div class="player-main">
             <div v-show="!isCollapsed">
                 <div class="dialog-header">
                     <span v-if="props.currentQid" class="qid-span">{{ props.currentQid }}</span>
@@ -108,6 +112,16 @@
                 </div>
             </div>
         </transition>
+
+        <!-- 提示弹窗 -->
+        <transition name="fade">
+            <div v-if="showNoQidTip" class="no-qid-tip">
+                <div class="no-qid-tip-content">
+                    <span class="material-icons">info</span>
+                    <span>请先选择题目</span>
+                </div>
+            </div>
+        </transition>
     </div>
 </template>
 
@@ -146,6 +160,7 @@ const audioRef       = ref(null)
 const transAudioRef  = ref(null)
 const autoPlayTimer  = ref(null)
 const showSettings   = ref(false)
+const showNoQidTip   = ref(false)
 const repeatTimes    = ref(0)
 const isCollapsed    = ref(false)
 const continuousPlayCount = ref(0)
@@ -244,14 +259,14 @@ const onTransAudioEnded = () => {
         setTimeout(() => replayCurrentAudio(), segmentGap.value * 1000)
         return
     }
-    
+
     // 标记为已收听
     if (currentDialog.value.qid && currentDialog.value.original?.id) {
         markAsListened(currentDialog.value.qid, currentDialog.value.original.id);
         // 发送事件通知列表更新
-        emitEvent('listening-progress-updated', { 
-            qid: currentDialog.value.qid, 
-            dialogId: currentDialog.value.original.id 
+        emitEvent('listening-progress-updated', {
+            qid: currentDialog.value.qid,
+            dialogId: currentDialog.value.original.id
         });
     }
 
@@ -357,6 +372,16 @@ watch(
     { deep: true }
 );
 
+// 监听折叠状态变化，通知其他组件
+watch(isCollapsed, (newValue) => {
+    // 设置全局变量供其他组件使用
+    window.isWalkmanCollapsed = newValue;
+    // 发送自定义事件
+    window.dispatchEvent(new CustomEvent('walkman-collapse-change', {
+        detail: { isCollapsed: newValue }
+    }));
+});
+
 const loadUserSettings = async () => {
     const settings = await getPlayerSettings();
     if (settings) {
@@ -373,7 +398,16 @@ const loadUserSettings = async () => {
 
 
 /* -------------- 控制按钮 (Control Buttons) -------------- */
-const togglePlay = () => isPlaying.value ? pauseCurrent() : playCurrent()
+const togglePlay = () => {
+    if (!props.currentQid) {
+        showNoQidTip.value = true
+        setTimeout(() => {
+            showNoQidTip.value = false
+        }, 2000)
+        return
+    }
+    isPlaying.value ? pauseCurrent() : playCurrent()
+}
 
 const prevDialog = () => {
     if (currentDialogIndex.value === 0) return
@@ -397,7 +431,7 @@ let resizeObserver = null;
 onMounted(() => {
     console.log('[Walkman] mounted');
     window.addEventListener('walkman-play-qid', onPlayQidEvent);
-    
+
     if (!data.loaded) {
         loadExcel();
     }
@@ -444,7 +478,7 @@ onUnmounted(() => {
   .player-main {
     max-width: 800px;
     margin: 0 auto;
-    padding: 24px 24px 24px 24px;
+    padding: 32px 24px 24px 24px;
     position: relative;
   }
   .dialog-header {
@@ -661,45 +695,65 @@ onUnmounted(() => {
   .title-span {
     font-weight: 600;
   }
-  .collapse-btn {
+  .collapse-indicator {
     position: absolute;
-    left: -20px;
-    top: 16px;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    border: none;
-    background: #f5f7fa;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    height: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 20px;
-    color: #495057;
     cursor: pointer;
-    transition: background 0.2s, box-shadow 0.2s, color 0.2s;
-    outline: none;
     z-index: 10;
+    transition: all 0.3s ease;
   }
-  .collapse-btn:hover {
-    background: #e3eafc;
+
+  .collapse-indicator:hover {
+    transform: translateX(-50%) scale(1.1);
+  }
+
+  .indicator-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 28px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    transition: all 0.3s ease;
+  }
+
+  .collapse-indicator:hover .indicator-content {
+    background: rgba(255, 255, 255, 1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    transform: translateY(-2px);
+  }
+
+  .indicator-content .material-icons {
+    font-size: 22px;
     color: #1976d2;
-    box-shadow: 0 4px 16px rgba(25,118,210,0.10);
+    transition: all 0.3s ease;
+  }
+
+  .collapse-indicator:hover .indicator-content .material-icons {
+    color: #1565c0;
+    transform: scale(1.2);
   }
 
   @media (max-width: 768px) {
     .record-container {
       display: none;
     }
-    
+
     .player-main {
-      padding: 16px;
+      padding: 28px 16px 16px 16px;
     }
 
     .dialog-header {
       font-size: 16px;
       padding-right: 40px; /* 为设置按钮留出空间 */
-      padding-left: 40px;  /* 为折叠按钮留出空间 */
     }
 
     .dialog-controls {
@@ -719,7 +773,7 @@ onUnmounted(() => {
       height: 56px;
       margin: 0 4px;
     }
-    
+
     .main-play .material-icons {
       font-size: 32px !important;
     }
@@ -732,12 +786,52 @@ onUnmounted(() => {
       top: 14px;
     }
 
-    .collapse-btn {
-      width: 36px;
-      height: 36px;
-      font-size: 22px;
-      left: 16px;
-      top: 14px;
+    .collapse-indicator {
+      width: 100px;
+      height: 20px;
     }
+
+    .indicator-content {
+      padding: 10px 20px;
+      border-radius: 16px;
+    }
+
+    .indicator-content .material-icons {
+      font-size: 20px;
+    }
+  }
+
+  /* 提示弹窗样式 */
+  .no-qid-tip {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.8);
+    border-radius: 8px;
+    padding: 16px 24px;
+    color: white;
+    font-size: 16px;
+    font-weight: 500;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  }
+
+  .no-qid-tip-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .no-qid-tip-content .material-icons {
+    font-size: 20px;
+    color: #ffc107;
+  }
+
+  .select-qid-tip {
+    text-align: center;
+    color: #888;
+    font-size: 18px;
+    padding: 32px 0 32px 0;
   }
   </style>

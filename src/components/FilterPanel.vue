@@ -261,12 +261,34 @@ function removeTag(tag) {
     min-height: 40px;
 }
 
+/* 移动端筛选标签样式 */
+@media (max-width: 768px) {
+    .filter-tags {
+        padding: 10px 12px;
+        min-height: 44px;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+}
+
 .filter-icon {
     display: flex;
     align-items: center;
     gap: 4px;
     color: #666;
     margin-right: 12px;
+}
+
+/* 移动端筛选图标样式 */
+@media (max-width: 768px) {
+    .filter-icon {
+        margin-right: 8px;
+        font-size: 14px;
+    }
+    
+    .filter-icon .material-icons {
+        font-size: 16px;
+    }
 }
 
 .selected-tags {
@@ -276,12 +298,28 @@ function removeTag(tag) {
     flex: 1;
 }
 
+/* 移动端选中标签样式 */
+@media (max-width: 768px) {
+    .selected-tags {
+        gap: 6px;
+    }
+}
+
 .tag {
     display: inline-flex;
     align-items: center;
     padding: 4px 12px;
     border-radius: 16px;
     font-size: 14px;
+}
+
+/* 移动端标签样式 */
+@media (max-width: 768px) {
+    .tag {
+        padding: 3px 10px;
+        font-size: 13px;
+        border-radius: 12px;
+    }
 }
 
 .time-tag {
@@ -306,11 +344,27 @@ function removeTag(tag) {
     line-height: 1;
 }
 
+/* 移动端移除按钮样式 */
+@media (max-width: 768px) {
+    .remove {
+        font-size: 16px;
+        margin-left: 3px;
+    }
+}
+
 .clear-all {
     font-size: 20px;
     color: #666;
     cursor: pointer;
     padding: 0 4px;
+}
+
+/* 移动端清除全部按钮样式 */
+@media (max-width: 768px) {
+    .clear-all {
+        font-size: 18px;
+        padding: 2px 6px;
+    }
 }
 
 .dropdown-menu {
@@ -326,12 +380,29 @@ function removeTag(tag) {
     padding: 16px;
 }
 
+/* 移动端下拉菜单样式 */
+@media (max-width: 768px) {
+    .dropdown-menu {
+        margin-top: 4px;
+        padding: 12px;
+        border-radius: 6px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+}
+
 .filter-section {
     margin-bottom: 16px;
 }
 
 .filter-section:last-child {
     margin-bottom: 0;
+}
+
+/* 移动端筛选区域样式 */
+@media (max-width: 768px) {
+    .filter-section {
+        margin-bottom: 12px;
+    }
 }
 
 .section-title {
@@ -345,10 +416,31 @@ function removeTag(tag) {
     border-bottom: 1px solid #eee;
 }
 
+/* 移动端区域标题样式 */
+@media (max-width: 768px) {
+    .section-title {
+        gap: 6px;
+        margin-bottom: 6px;
+        padding-bottom: 6px;
+        font-size: 14px;
+    }
+    
+    .section-title .material-icons {
+        font-size: 16px;
+    }
+}
+
 .section-content {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+}
+
+/* 移动端区域内容样式 */
+@media (max-width: 768px) {
+    .section-content {
+        gap: 6px;
+    }
 }
 
 .filter-item {
@@ -360,6 +452,20 @@ function removeTag(tag) {
     background: #f5f5f5;
     cursor: pointer;
     transition: all 0.2s;
+}
+
+/* 移动端筛选项样式 */
+@media (max-width: 768px) {
+    .filter-item {
+        padding: 5px 10px;
+        border-radius: 12px;
+        font-size: 13px;
+        gap: 3px;
+    }
+    
+    .filter-item .material-icons {
+        font-size: 16px;
+    }
 }
 
 .filter-item:hover {

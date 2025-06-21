@@ -430,6 +430,31 @@ const closeProgressHighlight = () => {
     margin: 0 auto;
     padding: 20px;
 }
+
+/* 移动端响应式调整 */
+@media (max-width: 768px) {
+    .container {
+        padding: 16px;
+        max-width: 100%;
+    }
+    
+    h1 {
+        font-size: 20px !important;
+        margin-bottom: 16px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .container {
+        padding: 12px;
+    }
+    
+    h1 {
+        font-size: 18px !important;
+        margin-bottom: 12px !important;
+    }
+}
+
 .with-walkman-padding {
     /* padding-bottom 由内联 style 控制 */
 }
@@ -523,11 +548,35 @@ const closeProgressHighlight = () => {
     transform: translateY(-2px);
 }
 
+/* 移动端重新组织布局 */
+@media (max-width: 768px) {
+    .question-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px;
+    }
+    
+    .question-content:hover {
+        transform: none; /* 移动端禁用悬停效果 */
+    }
+}
+
 .left-content {
     display: flex;
     align-items: center;
     gap: 6px;
     flex: 1;
+}
+
+/* 移动端调整左侧内容 */
+@media (max-width: 768px) {
+    .left-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        width: 100%;
+    }
 }
 
 .title {
@@ -540,15 +589,41 @@ const closeProgressHighlight = () => {
     line-height: 1.4;
 }
 
+/* 移动端标题样式 */
+@media (max-width: 768px) {
+    .title {
+        max-width: 100%;
+        font-size: 15px;
+        line-height: 1.3;
+    }
+}
+
 .tags {
     display: flex;
     gap: 4px;
+    flex-wrap: wrap;
+}
+
+/* 移动端标签样式 */
+@media (max-width: 768px) {
+    .tags {
+        gap: 6px;
+        margin-top: 4px;
+    }
 }
 
 .tag {
     padding: 2px 6px;
     border-radius: 4px;
     font-size: 12px;
+}
+
+/* 移动端标签样式 */
+@media (max-width: 480px) {
+    .tag {
+        padding: 3px 8px;
+        font-size: 11px;
+    }
 }
 
 .type-tag {
@@ -566,15 +641,35 @@ const closeProgressHighlight = () => {
     color: #1976d2;
 }
 
-.qid {
-    color: #666;
-    font-size: 12px;
-}
-
 .right-content {
     display: flex;
     align-items: center;
     gap: 6px;
+}
+
+/* 移动端右侧内容样式 */
+@media (max-width: 768px) {
+    .right-content {
+        width: 100%;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 8px;
+        border-top: 1px solid #e0e0e0;
+        gap: 8px;
+    }
+}
+
+/* 移动端进度条样式 */
+@media (max-width: 768px) {
+    .progress-bar-container {
+        width: 100px;
+        height: 6px;
+    }
+    
+    /* 移动端进度条和百分比组合 */
+    .progress-bar-container + .completion-text {
+        margin-left: 6px;
+    }
 }
 
 .progress-bar-container {
@@ -598,6 +693,14 @@ const closeProgressHighlight = () => {
     min-width: 32px;
 }
 
+/* 移动端完成度文本样式 */
+@media (max-width: 768px) {
+    .completion-text {
+        font-size: 11px;
+        min-width: 28px;
+    }
+}
+
 .login-prompt {
     font-size: 11px;
     color: #999;
@@ -606,12 +709,42 @@ const closeProgressHighlight = () => {
     flex-shrink: 0;
 }
 
+/* 移动端登录提示样式 */
+@media (max-width: 768px) {
+    .login-prompt {
+        width: 70px;
+        font-size: 10px;
+    }
+}
+
+.qid {
+    color: #666;
+    font-size: 12px;
+}
+
+/* 移动端题号样式 */
+@media (max-width: 768px) {
+    .qid {
+        font-size: 11px;
+        margin-left: auto;
+    }
+}
+
 .pagination {
     display: flex;
     justify-content: center;
     align-items: center;
     gap: 8px;
     margin-top: 32px;
+}
+
+/* 移动端分页样式 */
+@media (max-width: 768px) {
+    .pagination {
+        gap: 4px;
+        margin-top: 24px;
+        flex-wrap: wrap;
+    }
 }
 
 .page-btn {
@@ -628,6 +761,16 @@ const closeProgressHighlight = () => {
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+/* 移动端分页按钮样式 */
+@media (max-width: 480px) {
+    .page-btn {
+        min-width: 32px;
+        height: 32px;
+        padding: 0 8px;
+        font-size: 13px;
+    }
 }
 
 .page-btn:hover:not(:disabled) {
@@ -654,9 +797,17 @@ const closeProgressHighlight = () => {
     font-size: 20px;
 }
 
+/* 移动端导航按钮图标样式 */
+@media (max-width: 480px) {
+    .nav-btn .material-icons {
+        font-size: 18px;
+    }
+}
+
 .page-ellipsis {
     color: #888;
     padding: 0 4px;
     align-self: flex-end;
 }
 </style>
+
