@@ -106,7 +106,7 @@ onMounted(() => {
 });
 
 const handleClose = () => {
-    localStorage.setItem('featureVideoVersion', FEATURE_VIDEO_VERSION);
+    // localStorage.setItem('featureVideoVersion', FEATURE_VIDEO_VERSION);
     showFeatureVideo.value = false;
     if (localStorage.getItem('hasSeenUserGuide') !== 'true') {
         setTimeout(() => {
