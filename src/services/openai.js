@@ -70,6 +70,58 @@ export async function transcribeAudio(audioBlob, language, prompt) {
   });
 }
 
+// 新增：获取笔记智能提示
+export async function getNoteSuggestions(originalText, translationText, aiCheckResult, currentNoteText = '') {
+  return retryWithBackoff(async () => {
+    const response = await fetch(LAMBDA_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        endpoint: 'noteSuggestions',
+        originalText,
+        translationText,
+        aiCheckResult,
+        currentNoteText
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('API request failed');
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+  });
+}
+
+// 新增：获取智能补全
+export async function getSmartCompletion(originalText, translationText, aiCheckResult, currentInput = '') {
+  return retryWithBackoff(async () => {
+    const response = await fetch(LAMBDA_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        endpoint: 'smartCompletion',
+        originalText,
+        translationText,
+        aiCheckResult,
+        currentInput
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('API request failed');
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+  });
+}
+
 // 辅助函数：将文件转换为base64
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {

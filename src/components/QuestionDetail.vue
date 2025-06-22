@@ -167,19 +167,44 @@
 
                     <!-- 添加新笔记 -->
                     <div class="add-note-container">
-                        <textarea
-                            v-model="newNoteText[dialog.original.id]"
-                            placeholder="记录你的笔记..."
-                            class="note-textarea"
-                            rows="3"
-                        ></textarea>
-                        <button
-                            class="add-note-btn"
-                            @click="handleAddNote(dialog)"
-                            :disabled="!newNoteText[dialog.original.id] || newNoteText[dialog.original.id].trim().length === 0"
-                        >
-                            <span class="material-icons">send</span>
-                        </button>
+                        <div class="note-input-row">
+                            <div class="note-input-wrapper">
+                                <textarea
+                                    v-model="newNoteText[dialog.original.id]"
+                                    placeholder="记录你的笔记... (输入内容后会自动显示智能补全，按Tab键接受补全)"
+                                    class="note-textarea"
+                                    rows="3"
+                                    @keydown="handleNoteKeydown($event, dialog)"
+                                    @input="handleNoteInput($event, dialog)"
+                                    ref="noteTextarea"
+                                ></textarea>
+                            </div>
+                        </div>
+                        
+                        <!-- 智能补全显示 -->
+                        <div v-if="showInlineCompletion[dialog.original.id] && inlineCompletion[dialog.original.id]" class="external-completion">
+                            <span class="material-icons">auto_awesome</span>
+                            <div class="completion-text-wrapper">
+                                <span class="completion-prefix">{{ newNoteText[dialog.original.id] }}</span>
+                                <span class="completion-suggestion">{{ inlineCompletion[dialog.original.id] }}</span>
+                            </div>
+                            <span class="completion-hint">按 Tab 补全</span>
+                        </div>
+
+                        <div class="note-actions-row">
+                            <button
+                                class="add-note-btn"
+                                @click="handleAddNote(dialog)"
+                                :disabled="!newNoteText[dialog.original.id] || newNoteText[dialog.original.id].trim().length === 0"
+                            >
+                                保存笔记
+                            </button>
+                        </div>
+
+                        <!-- 提示错误信息 -->
+                        <div v-if="suggestionError[dialog.original.id]" class="suggestion-error">
+                            {{ suggestionError[dialog.original.id] }}
+                        </div>
                     </div>
 
                     <!-- 笔记列表 -->
@@ -314,7 +339,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useData } from '../services/useData.js'
-import { checkTranslation, transcribeAudio } from '../services/openai.js'
+import { checkTranslation, transcribeAudio, getNoteSuggestions, getSmartCompletion } from '../services/openai.js'
 import { addFavorite, removeFavorite, getAllFavorites } from '../services/favorites.js'
 import { markAsLearned } from '../services/learned.js'
 import { getNotes, addNote, updateNote, deleteNote, saveDialogContent } from '../services/notes.js'
@@ -348,6 +373,16 @@ const newNoteText = ref({}) // 存储每个对话的新笔记内容
 const editingNoteId = ref(null) // 当前正在编辑的笔记ID
 const editingNoteText = ref('') // 当前正在编辑的笔记内容
 const notesError = ref(null); // 笔记操作的错误信息
+
+// 新增：笔记智能提示相关状态
+const noteSuggestions = ref({}) // 存储每个对话的笔记提示
+const isGettingSuggestions = ref({}) // 存储每个对话是否正在获取提示
+const suggestionError = ref({}) // 存储每个对话的提示错误信息
+
+// 新增：内联智能补全相关状态
+const showInlineCompletion = ref({}) // 控制是否显示内联补全
+const inlineCompletion = ref({}) // 存储内联补全内容
+const completionDebounceTimer = ref({}) // 防抖定时器
 
 // 存储所有录音及其转录
 // recordingsList: { [dialogIdx]: [ { url, text, timestamp, aiCheck } ] }
@@ -1139,6 +1174,173 @@ function toggleNotesSection(dialog) {
   }
 }
 
+// 新增：获取笔记智能提示
+async function getNoteSuggestion(dialog) {
+  const dialogId = dialog.original.id;
+  if (!dialogId) return;
+  
+  try {
+    isGettingSuggestions.value[dialogId] = true;
+    suggestionError.value[dialogId] = null;
+    
+    // 获取最新的录音和AI检查结果
+    const dialogIndex = dialogs.value.findIndex(d => String(d.original.id) === String(dialogId));
+    const latestRecording = dialogIndex !== -1 ? 
+      recordingsList.value[dialogIndex]?.[recordingsList.value[dialogIndex].length - 1] : null;
+    const aiCheckResult = latestRecording?.aiCheck || '';
+    
+    const suggestion = await getNoteSuggestions(
+      dialog.original.text,
+      dialog.translation.text,
+      aiCheckResult,
+      newNoteText.value[dialogId] || ''
+    );
+    
+    // 提取笔记内容（去掉"笔记内容："前缀）
+    const noteContent = suggestion.replace(/^笔记内容：/, '').trim();
+    noteSuggestions.value[dialogId] = noteContent;
+    
+  } catch (e) {
+    console.error('获取笔记提示失败:', e);
+    suggestionError.value[dialogId] = '获取智能提示失败，请稍后重试';
+  } finally {
+    isGettingSuggestions.value[dialogId] = false;
+  }
+}
+
+// 新增：使用智能提示
+function useSuggestion(dialog) {
+  const dialogId = dialog.original.id;
+  if (noteSuggestions.value[dialogId]) {
+    newNoteText.value[dialogId] = noteSuggestions.value[dialogId];
+    clearSuggestion(dialogId);
+  }
+}
+
+// 新增：清除智能提示
+function clearSuggestion(dialogId) {
+  noteSuggestions.value[dialogId] = null;
+  suggestionError.value[dialogId] = null;
+}
+
+// 新增：处理笔记输入事件（智能补全）
+async function handleNoteInput(event, dialog) {
+  const dialogId = dialog.original.id;
+  
+  // 清除之前的定时器
+  if (completionDebounceTimer.value[dialogId]) {
+    clearTimeout(completionDebounceTimer.value[dialogId]);
+  }
+  
+  const text = event.target.value; // 获取当前输入框的最新文本
+  // 如果输入内容为空，则隐藏补全提示
+  if (!text || text.trim().length === 0) {
+    hideInlineCompletion(dialogId);
+    return;
+  }
+  
+  // 当输入字符过少时，不发送请求，避免频繁调用
+  if (text.trim().length < 3) {
+      return;
+  }
+
+  // 防抖处理，500ms后获取补全
+  completionDebounceTimer.value[dialogId] = setTimeout(async () => {
+    try {
+        // 在执行前再次获取最新的文本内容，以防延迟期间发生变化
+        const currentText = newNoteText.value[dialogId];
+        // 再次检查，确保文本不为空且足够长
+        if (currentText && currentText.trim().length >= 3) {
+            await getInlineCompletion(dialog, currentText);
+        } else {
+            hideInlineCompletion(dialogId);
+        }
+    } catch (e) {
+      console.error('获取智能补全失败:', e);
+    }
+  }, 250); // 延迟增加到 500ms
+}
+
+// 新增：处理笔记键盘事件（Tab键补全）
+function handleNoteKeydown(event, dialog) {
+  const dialogId = dialog.original.id;
+  
+  if (event.key === 'Tab') {
+    event.preventDefault();
+    
+    if (showInlineCompletion.value[dialogId] && inlineCompletion.value[dialogId]) {
+      // 应用内联补全
+      applyInlineCompletion(dialog);
+    }
+  } else if (event.key === 'Escape') {
+    hideInlineCompletion(dialogId);
+  }
+}
+
+// 新增：获取内联智能补全
+async function getInlineCompletion(dialog, currentText) {
+  const dialogId = dialog.original.id;
+  
+  try {
+    console.log('开始获取智能补全:', { dialogId, currentText });
+    
+    // 获取最新的录音和AI检查结果
+    // 需要找到对话在数组中的索引来获取录音数据
+    const dialogIndex = dialogs.value.findIndex(d => String(d.original.id) === String(dialogId));
+    const latestRecording = dialogIndex !== -1 ? 
+      recordingsList.value[dialogIndex]?.[recordingsList.value[dialogIndex].length - 1] : null;
+    const aiCheckResult = latestRecording?.aiCheck || '';
+    
+    console.log('获取到的上下文:', {
+      dialogIndex,
+      originalText: dialog.original.text,
+      translationText: dialog.translation.text,
+      aiCheckResult: aiCheckResult,
+      currentInput: currentText,
+      recordingsList: recordingsList.value[dialogIndex]
+    });
+    
+    // 即使没有AI检查结果，也尝试提供智能补全
+    // 基于原文、翻译和用户当前输入来生成补全
+    const completion = await getSmartCompletion(
+      dialog.original.text,
+      dialog.translation.text,
+      aiCheckResult,
+      currentText
+    );
+    
+    console.log('获取到的补全结果:', completion);
+    
+    if (completion && completion.trim().length > 0) {
+      inlineCompletion.value[dialogId] = completion;
+      showInlineCompletion.value[dialogId] = true;
+      console.log('设置内联补全:', { dialogId, completion });
+    } else {
+      hideInlineCompletion(dialogId);
+      console.log('隐藏内联补全，无有效补全内容');
+    }
+    
+  } catch (e) {
+    console.error('获取智能补全失败:', e);
+    hideInlineCompletion(dialogId);
+  }
+}
+
+// 新增：应用内联补全
+function applyInlineCompletion(dialog) {
+  const dialogId = dialog.original.id;
+  if (inlineCompletion.value[dialogId]) {
+    newNoteText.value[dialogId] = newNoteText.value[dialogId] + inlineCompletion.value[dialogId];
+    hideInlineCompletion(dialogId);
+  }
+}
+
+// 新增：隐藏内联补全
+function hideInlineCompletion(dialogId) {
+  showInlineCompletion.value[dialogId] = false;
+  inlineCompletion.value[dialogId] = null;
+}
+
 const transcribingStatus = ref('idle') // 'idle' | 'transcribing' | 'scoring' | 'done'
 const currentTranscribingDialogId = ref(null)
 const recordError = ref('')
@@ -1847,23 +2049,47 @@ h3 {
 
 .notes-section {
     margin-top: 24px;
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 20px;
-    border: 1px solid #eee;
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    border-radius: 12px;
+    padding: 24px;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    position: relative;
+    overflow: hidden;
+}
+
+.notes-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
 }
 
 .notes-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 16px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e9ecef;
 }
 
 .notes-header h4 {
     margin: 0;
-    font-size: 16px;
+    font-size: 18px;
     color: #333;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.notes-header h4::before {
+    content: '📝';
+    font-size: 20px;
 }
 
 .add-note-container {
@@ -1873,49 +2099,253 @@ h3 {
     margin-bottom: 20px;
 }
 
+.note-input-row {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.note-input-wrapper {
+    position: relative;
+    flex: 1;
+}
+
+.note-input-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.note-input-label {
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+}
+
+.ai-completion-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+    animation: shimmer 2s infinite;
+}
+
+.ai-completion-badge .material-icons {
+    font-size: 14px;
+}
+
+@keyframes shimmer {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+}
+
 .note-textarea {
+    flex: 1;
     width: 100%;
     padding: 10px;
-    border: 1px solid #ddd;
     border-radius: 4px;
     font-size: 14px;
     resize: vertical;
     min-height: 60px;
+    background: white;
+    z-index: 1;
+    position: relative;
+    color: #333;
+    border: 1px solid #ddd;
+    transition: border-color 0.3s ease;
+}
+
+.note-textarea:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
 }
 
 .note-textarea.edit-mode {
     border-color: #007bff;
 }
 
+.note-actions-row {
+    display: flex;
+    justify-content: flex-end; /* Align button to the right */
+    margin-top: 12px;
+}
+
 .add-note-btn {
+    padding: 8px 20px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.add-note-btn:hover:not(:disabled) {
+    background: #0056b3;
+}
+
+.add-note-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: #ccc;
+    transform: none;
+    box-shadow: none;
+}
+
+.suggestion-btn {
     padding: 0;
     background: transparent;
-    color: #28a745; /* 绿色 */
-    border: 1px solid #28a745;
+    color: #ffc107; /* 黄色灯泡 */
+    border: 1px solid #ffc107;
     border-radius: 50%;
     width: 30px;
     height: 30px;
     cursor: pointer;
     transition: all 0.2s;
     font-size: 14px;
-    align-self: flex-end; /* 靠右对齐 */
-    display: flex; /* 居中图标 */
+    display: flex;
     align-items: center;
     justify-content: center;
 }
 
-.add-note-btn:hover:not(:disabled) {
-    background: #e6ffe6; /* 绿色浅色背景 */
-    color: #218838;
-    border-color: #218838;
+.suggestion-btn:hover:not(:disabled) {
+    background: #fff3cd;
+    color: #e0a800;
+    border-color: #e0a800;
 }
 
-.add-note-btn:disabled {
+.suggestion-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
     background: transparent;
     color: #999;
     border-color: #999;
+}
+
+.suggestion-content {
+    margin-top: 10px;
+    padding: 12px;
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 6px;
+}
+
+.suggestion-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #856404;
+}
+
+.suggestion-header .material-icons {
+    font-size: 18px;
+    color: #ffc107;
+}
+
+.suggestion-close-btn {
+    margin-left: auto;
+    padding: 4px;
+    background: transparent;
+    color: #856404;
+    border: none;
+    cursor: pointer;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.suggestion-close-btn:hover {
+    background: #ffeaa7;
+    color: #6c5ce7;
+}
+
+.suggestion-text {
+    margin-bottom: 10px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #856404;
+    white-space: pre-wrap;
+}
+
+.use-suggestion-btn {
+    padding: 6px 12px;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.use-suggestion-btn:hover {
+    background: #218838;
+}
+
+.use-suggestion-btn .material-icons {
+    font-size: 16px;
+}
+
+.suggestion-error {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #e9f5ff;
+    color: #0056b3;
+    border: 1px solid #bce0fd;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.rotating {
+    animation: rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.record-error-toast {
+  position: fixed;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000;
+  background: #fff0f0;
+  color: #d32f2f;
+  border: 1px solid #f5c6cb;
+  border-radius: 8px;
+  padding: 16px 32px;
+  font-size: 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  animation: fadeInOut 3s;
+}
+@keyframes fadeInOut {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
 .notes-list {
@@ -1941,7 +2371,7 @@ h3 {
     margin: 0 0 10px 0;
     line-height: 1.6;
     color: #333;
-    white-space: pre-wrap; /* Preserve line breaks */
+    white-space: pre-wrap;
 }
 
 .note-timestamp {
@@ -1981,8 +2411,8 @@ h3 {
 
 .save-btn {
     background-color: transparent;
-    color: #28a745; /* 绿色 */
-    border: 1px solid #28a745;
+    color: #007bff;
+    border: 1px solid #007bff;
     border-radius: 50%;
     width: 30px;
     height: 30px;
@@ -1990,15 +2420,15 @@ h3 {
 }
 
 .save-btn:hover {
-    background-color: #e6ffe6; /* 绿色浅色背景 */
-    color: #218838;
-    border-color: #218838;
+    background-color: #e9f5ff;
+    color: #0056b3;
+    border-color: #0056b3;
 }
 
 .cancel-btn {
     background-color: transparent;
-    color: #dc3545; /* 红色 */
-    border: 1px solid #dc3545;
+    color: #6c757d;
+    border: 1px solid #6c757d;
     border-radius: 50%;
     width: 30px;
     height: 30px;
@@ -2006,9 +2436,9 @@ h3 {
 }
 
 .cancel-btn:hover {
-    background-color: #ffe6e6; /* 红色浅色背景 */
-    color: #c82333;
-    border-color: #c82333;
+    background-color: #f8f9fa;
+    color: #343a40;
+    border-color: #343a40;
 }
 
 .empty-notes {
@@ -2020,64 +2450,239 @@ h3 {
 }
 
 .notes-error {
-    background-color: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
+    background-color: #e9f5ff;
+    color: #0056b3;
+    border: 1px solid #bce0fd;
     border-radius: 4px;
     padding: 10px;
     margin-bottom: 15px;
     font-size: 14px;
 }
 
-/* 新增：编辑模式下的笔记操作按钮容器样式 */
 .note-actions-edit-mode {
     display: flex;
-    justify-content: flex-end; /* 靠右对齐 */
+    justify-content: flex-end;
     gap: 10px;
-    margin-top: 10px; /* 与文本框的间距 */
+    margin-top: 10px;
 }
 
-.action-btn {
-    background: none;
+/* Tab自动补全样式 */
+.tab-completion {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1000;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.completion-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #eee;
+    font-size: 12px;
+    color: #666;
+}
+
+.completion-header .material-icons {
+    font-size: 16px;
+    color: #007bff;
+}
+
+.completion-close-btn {
+    margin-left: auto;
+    padding: 2px;
+    background: transparent;
+    color: #666;
     border: none;
     cursor: pointer;
-    color: #666;
-    transition: color 0.2s;
-    padding: 4px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
+    transition: all 0.2s;
 }
 
-.action-btn:hover {
+.completion-close-btn:hover {
+    background: #e9ecef;
+    color: #333;
+}
+
+.completion-list {
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.completion-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-bottom: 1px solid #f8f9fa;
+}
+
+.completion-item:last-child {
+    border-bottom: none;
+}
+
+.completion-item:hover {
+    background: #f8f9fa;
+}
+
+.completion-item.selected {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.completion-text {
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+}
+
+.completion-hint {
+    font-size: 11px;
+    color: #999;
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 8px;
+}
+
+/* 内联智能补全样式 */
+.inline-completion {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    color: #333;
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    z-index: 2;
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: inherit;
+    padding: 10px;
+    margin: 0;
+    display: flex;
+    align-items: flex-start;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.completion-prefix {
+    color: #333;
+    opacity: 1;
+}
+
+.completion-suggestion {
     color: #007bff;
-    background-color: #f0f0f0;
+    opacity: 0.7;
+    font-weight: 500;
+    background: linear-gradient(90deg, rgba(0, 123, 255, 0.1) 0%, rgba(0, 123, 255, 0.05) 100%);
+    padding: 2px 4px;
+    border-radius: 3px;
+    border-left: 2px solid #007bff;
+    margin-left: 2px;
 }
 
-.action-btn .material-icons {
-    font-size: 18px;
+.inline-completion-hint {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: #007bff;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    opacity: 0.9;
+    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
+    animation: pulse 2s infinite;
 }
 
-.record-error-toast {
-  position: fixed;
-  top: 40px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 2000;
-  background: #fff0f0;
-  color: #d32f2f;
-  border: 1px solid #f5c6cb;
-  border-radius: 8px;
-  padding: 16px 32px;
-  font-size: 16px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-  animation: fadeInOut 3s;
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
 }
-@keyframes fadeInOut {
-  0% { opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { opacity: 0; }
+
+.external-completion {
+    margin-top: 12px;
+    padding: 12px;
+    background: #e9f5ff;
+    border-left: 4px solid #007bff;
+    border-radius: 0 6px 6px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #333;
+    animation: slideInUp 0.3s ease-out;
+}
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.external-completion .material-icons {
+    font-size: 20px;
+    color: #007bff;
+}
+
+.external-completion .completion-text-wrapper {
+    flex-grow: 1;
+}
+
+.completion-prefix {
+    font-weight: 500;
+    color: #333;
+}
+
+.completion-suggestion {
+    opacity: 0.6;
+    font-weight: 500;
+    color: #0056b3;
+    margin-left: 4px; /* Add a small space for better separation */
+}
+
+.external-completion .completion-hint {
+    background: #007bff;
+    color: white;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.completion-text-wrapper {
+    display: block; /* Change from flex to block to allow natural text flow */
 }
 </style>
