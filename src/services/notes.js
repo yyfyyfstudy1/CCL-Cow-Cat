@@ -1,6 +1,6 @@
 import { db } from './firebase'
 import { getAuth } from 'firebase/auth'
-import { doc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, limit, setDoc } from 'firebase/firestore'
+import { doc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, limit, setDoc, getCountFromServer, collectionGroup, where } from 'firebase/firestore'
 
 const NOTES_LIMIT = 10; // 每个对话最多10条笔记
 
@@ -58,4 +58,15 @@ export async function deleteNote(dialogId, noteId) {
   if (!user) throw new Error('未登录')
   const noteRef = doc(db, 'users', user.uid, 'dialogs', String(dialogId), 'notes', noteId)
   await deleteDoc(noteRef)
+}
+
+// 获取当前用户所有笔记的总数（只发一次请求，需 notes 里有 userId 字段）
+export async function fetchNotesCount() {
+  const user = getAuth().currentUser
+  if (!user) throw new Error('未登录')
+  // collectionGroup 查询所有 notes 子集合
+  // 只查属于当前用户的 notes
+  const notesQuery = query(collectionGroup(db, 'notes'), where('userId', '==', user.uid))
+  const snapshot = await getCountFromServer(notesQuery)
+  return snapshot.data().count
 } 

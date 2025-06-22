@@ -93,6 +93,7 @@ import { getAllListeningProgress } from '../services/listeningProgress.js';
 import { useRouter } from 'vue-router';
 import { db } from '../services/firebase';
 import { collection, getDocs } from 'firebase/firestore';
+import { fetchNotesCount } from '../services/notes.js';
 
 const userEmail = ref('');
 const favoriteIds = ref([]);
@@ -114,7 +115,7 @@ onMounted(async () => {
             getAllFavorites(),
             getAllLearned(),
             getAllListeningProgress(),
-            fetchNotes(user.uid)
+            fetchNotesCount()
         ]);
 
         favoriteIds.value = favorites;
@@ -142,26 +143,6 @@ onMounted(async () => {
         notesCount.value = 0;
     }
 });
-
-
-async function fetchNotes(uid) {
-    try {
-        let totalNotes = 0;
-        const dialogsColRef = collection(db, 'users', uid, 'dialogs');
-        const dialogsSnapshot = await getDocs(dialogsColRef);
-
-        for (const dialogDoc of dialogsSnapshot.docs) {
-            const notesColRef = collection(db, 'users', uid, 'dialogs', dialogDoc.id, 'notes');
-            const notesSnapshot = await getDocs(notesColRef);
-            totalNotes += notesSnapshot.docs.length;
-        }
-        return totalNotes;
-    } catch (e) {
-        console.error("加载笔记总数失败:", e);
-        return 0; // Return 0 on error
-    }
-}
-
 
 function goToFavorites() {
     router.push('/my-favorites');
