@@ -8,12 +8,12 @@
         </main>
     </div>
     <Analytics />
-    <NotificationBanner v-if="showBanner" @closed="handleNotificationClosed" />
     <Mp3PollModal :show="showMp3Poll" />
     <LoginModal :is-open="isLoginModalOpen" @close="isLoginModalOpen = false" @login-success="isLoginModalOpen = false" />
     <UserGuide :show="showGuide" :steps="guideSteps" @close="handleGuideClose" />
     <FeedbackModal :show="showFeedbackModal" @close="showFeedbackModal = false" />
     <VersionChecker />
+    <FeatureVideoModal :visible="showFeatureVideo" @close="handleClose" />
 </template>
 
 <script setup>
@@ -27,6 +27,7 @@ import LoginModal from './components/LoginModal.vue';
 import UserGuide from './components/UserGuide.vue';
 import FeedbackModal from './components/FeedbackModal.vue';
 import VersionChecker from './components/VersionChecker.vue';
+import FeatureVideoModal from './components/FeatureVideoModal.vue';
 import { useEventBus } from './services/eventBus.js';
 import { useData } from './services/useData.js';
 
@@ -37,9 +38,10 @@ const showMp3Poll = ref(false);
 const isLoginModalOpen = ref(false);
 const showGuide = ref(false);
 const showFeedbackModal = ref(false);
+const showFeatureVideo = ref(false);
 
 const isMobile = ref(window.innerWidth < 768);
-const showBanner = ref(true); // Default to true for desktop
+const showBanner = ref(false); // 取消NotificationBanner弹窗
 
 const guideSteps = [
     {
@@ -76,15 +78,21 @@ const openLoginModal = () => {
     isLoginModalOpen.value = true;
 };
 
+const FEATURE_VIDEO_VERSION = '2024-06-09'; // 有新视频时修改此版本号
+
 onMounted(() => {
     const onResize = () => isMobile.value = window.innerWidth < 768;
     window.addEventListener('resize', onResize);
     onUnmounted(() => window.removeEventListener('resize', onResize));
 
     const hasSeenGuide = localStorage.getItem('hasSeenUserGuide') === 'true';
-
-    if (isMobile.value && !hasSeenGuide) {
-        showBanner.value = false; // Hide banner initially on mobile first visit
+    const watchedVersion = localStorage.getItem('featureVideoVersion');
+    if (watchedVersion !== FEATURE_VIDEO_VERSION) {
+        showFeatureVideo.value = true;
+    } else if (!hasSeenGuide) {
+        setTimeout(() => {
+            showGuide.value = true;
+        }, 500);
     }
 
     loadExcel();
@@ -95,18 +103,17 @@ onMounted(() => {
     on('open-feedback-modal', () => {
         showFeedbackModal.value = true;
     });
-
-    if (!hasSeenGuide) {
-        setTimeout(() => {
-            showGuide.value = true;
-        }, 500);
-    }
 });
 
-// Optional: unregister on unmount, though for App.vue it's less critical
-// onUnmounted(() => {
-//   // a way to unregister is needed in eventBus
-// });
+const handleClose = () => {
+    localStorage.setItem('featureVideoVersion', FEATURE_VIDEO_VERSION);
+    showFeatureVideo.value = false;
+    if (localStorage.getItem('hasSeenUserGuide') !== 'true') {
+        setTimeout(() => {
+            showGuide.value = true;
+        }, 100);
+    }
+};
 </script>
 
 <style>

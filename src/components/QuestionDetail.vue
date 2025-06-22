@@ -182,14 +182,19 @@
                         </div>
                         
                         <!-- 智能补全显示 -->
-                        <div v-if="showInlineCompletion[dialog.original.id] && inlineCompletion[dialog.original.id]" class="external-completion">
-                            <span class="material-icons">auto_awesome</span>
-                            <div class="completion-text-wrapper">
-                                <span class="completion-prefix">{{ newNoteText[dialog.original.id] }}</span>
-                                <span class="completion-suggestion">{{ inlineCompletion[dialog.original.id] }}</span>
+                        <template v-if="showInlineCompletion[dialog.original.id] && inlineCompletion[dialog.original.id]">
+                            <div class="completion-hint-top-outer">点击或按Tab下方提示框补全</div>
+                            <div class="external-completion"
+                                 @click="applyInlineCompletion(dialog)"
+                                 style="cursor: pointer;"
+                            >
+                                <span class="material-icons">auto_awesome</span>
+                                <div class="completion-text-wrapper">
+                                    <span class="completion-prefix">{{ newNoteText[dialog.original.id] }}</span>
+                                    <span class="completion-suggestion">{{ inlineCompletion[dialog.original.id] }}</span>
+                                </div>
                             </div>
-                            <span class="completion-hint">按 Tab 补全</span>
-                        </div>
+                        </template>
 
                         <div class="note-actions-row">
                             <button
@@ -1389,6 +1394,8 @@ watch(newNoteText, (val) => {
     })
   })
 }, { deep: true })
+
+const isMobile = window.innerWidth < 768 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 </script>
 
 <style scoped>
@@ -2719,5 +2726,19 @@ h3 {
 
 .completion-text-wrapper {
     display: block; /* Change from flex to block to allow natural text flow */
+}
+
+.external-completion.mobile-tap:hover {
+    background: #f0f7ff;
+}
+
+.completion-hint-top-outer {
+    text-align: left;
+    font-size: 13px;
+    color: #409eff;
+    font-weight: 500;
+    margin-bottom: 2px;
+    letter-spacing: 0.2px;
+    margin-top: 8px;
 }
 </style>
