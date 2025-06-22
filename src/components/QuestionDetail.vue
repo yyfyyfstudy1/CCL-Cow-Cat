@@ -176,7 +176,7 @@
                                     rows="3"
                                     @keydown="handleNoteKeydown($event, dialog)"
                                     @input="handleNoteInput($event, dialog)"
-                                    ref="noteTextarea"
+                                    :ref="el => setNoteTextareaRef(el, dialog.original.id)"
                                 ></textarea>
                             </div>
                         </div>
@@ -347,6 +347,8 @@ import { markAsLearned } from '../services/learned.js'
 import { getNotes, addNote, updateNote, deleteNote, saveDialogContent } from '../services/notes.js'
 import { getAuth, onAuthStateChanged } from 'firebase/auth' // 导入 Firebase Auth
 import { uploadAudioToLambda } from '@/services/googleDrive'
+import autosize from 'autosize'
+import { nextTick } from 'vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -1174,6 +1176,10 @@ function toggleNotesSection(dialog) {
     // 只有当笔记部分显示且笔记列表为空时才加载
     loadNotes(dialog);
   }
+  nextTick(() => {
+    const el = noteTextareaRefs.value[dialog.original.id]
+    if (el) autosize.update(el)
+  })
 }
 
 // 新增：获取笔记智能提示
@@ -1366,6 +1372,23 @@ function handleBack() {
         router.back();
     }
 }
+
+const noteTextareaRefs = ref({})
+
+function setNoteTextareaRef(el, id) {
+  if (el) {
+    noteTextareaRefs.value[id] = el
+    autosize(el)
+  }
+}
+
+watch(newNoteText, (val) => {
+  nextTick(() => {
+    Object.entries(noteTextareaRefs.value).forEach(([id, el]) => {
+      if (el) autosize.update(el)
+    })
+  })
+}, { deep: true })
 </script>
 
 <style scoped>
