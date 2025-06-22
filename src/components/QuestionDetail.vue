@@ -227,14 +227,16 @@
                             </template>
                             <template v-else>
                                 <p class="note-text">{{ note.text }}</p>
-                                <span class="note-timestamp">{{ new Date(note.createdAt).toLocaleString() }}</span>
-                                <div class="note-actions">
-                                    <button class="action-btn" @click="handleEditNote(note)" title="编辑">
-                                        <span class="material-icons">edit</span>
-                                    </button>
-                                    <button class="action-btn" @click="handleDeleteNote(dialog, note.id)" title="删除">
-                                        <span class="material-icons">delete</span>
-                                    </button>
+                                <div class="note-footer">
+                                    <span class="note-timestamp">{{ new Date(note.createdAt).toLocaleString() }}</span>
+                                    <div class="note-actions">
+                                        <button class="action-btn" @click="handleEditNote(note)" title="编辑">
+                                            <span class="material-icons">edit</span>
+                                        </button>
+                                        <button class="action-btn" @click="handleDeleteNote(dialog, note.id)" title="删除">
+                                            <span class="material-icons">delete</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </template>
                         </div>
@@ -2359,8 +2361,15 @@ h3 {
     border-radius: 6px;
     padding: 15px;
     margin-bottom: 15px;
-    position: relative;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: box-shadow 0.2s ease-in-out;
+}
+
+.note-item:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.08);
 }
 
 .note-item:last-child {
@@ -2368,10 +2377,16 @@ h3 {
 }
 
 .note-text {
-    margin: 0 0 10px 0;
+    margin: 0;
     line-height: 1.6;
     color: #333;
     white-space: pre-wrap;
+}
+
+.note-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .note-timestamp {
@@ -2380,9 +2395,6 @@ h3 {
 }
 
 .note-actions {
-    position: absolute;
-    top: 10px;
-    right: 10px;
     display: flex;
     gap: 5px;
 }
