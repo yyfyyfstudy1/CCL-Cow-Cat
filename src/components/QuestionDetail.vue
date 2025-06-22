@@ -854,7 +854,7 @@ async function startRecording(dialogId) {
       })
 
     } catch (err) {
-      aiCheckResult = '转录或翻译检查失败'
+      // aiCheckResult = '转录或翻译检查失败'
       recordError.value = '语音转录或AI打分失败，请检查网络或稍后重试，再次点击"开始录音"可重新尝试。'
       showRecordError.value = true
       setTimeout(() => { showRecordError.value = false }, 3000)
@@ -1150,11 +1150,11 @@ function handleBack() {
         page: route.query.page,
         filters: route.query.filters
     };
-    
+
     // 如果有保存的状态，返回到QuestionList并传递状态
     if (savedState.page || savedState.filters) {
-        router.push({ 
-            path: '/', 
+        router.push({
+            path: '/',
             query: savedState
         });
     } else {
