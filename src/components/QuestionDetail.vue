@@ -50,6 +50,10 @@
 
             <!-- 对话内容 -->
             <div v-for="(dialog, idx) in sortedDialogs" :key="dialog.original.id" class="section">
+                <!-- 收藏模式下显示添加时间 -->
+                <div v-if="isFavoritesMode && dialog.createdAt" class="favorite-created-at" style="color:#888;font-size:13px;margin-bottom:4px;">
+                  添加时间：{{ new Date(dialog.createdAt).toLocaleString() }}
+                </div>
                 <div class="dialog-header-row">
                     <div style="display:flex;align-items:center;gap:8px;">
                         <h3 style="margin:0;">对话 {{ idx + 1 }}</h3>
@@ -304,7 +308,7 @@
                         </div>
 
                         <div class="recordings-list">
-                            <div v-for="(recording, rIdx) in recordingsList[idx]"
+                            <div v-for="(recording, rIdx) in (recordingsList[idx] ? [...recordingsList[idx]].reverse() : [])"
                                 :key="rIdx"
                                 class="recording-item"
                             >
@@ -1969,7 +1973,7 @@ h3 {
 
 /* 新增：熟练度提示框样式 */
 .mastery-tooltip {
-    position: absolute;
+    position: absolute; /* 根据需要调整位置 */
     top: -35px; /* 根据需要调整位置 */
     left: 50%;
     transform: translateX(-50%);
