@@ -7,7 +7,15 @@ export async function addFavorite(dialogId, mastery = 0) {
   const user = getAuth().currentUser
   if (!user) throw new Error('未登录')
   const id = String(dialogId)
-  await setDoc(doc(db, 'users', user.uid, 'favorites', id), { id, createdAt: Date.now(), mastery })
+  const ref = doc(db, 'users', user.uid, 'favorites', id)
+  const snap = await getDoc(ref)
+  if (snap.exists()) {
+    // 已存在，只更新mastery
+    await setDoc(ref, { mastery }, { merge: true })
+  } else {
+    // 首次添加，写入createdAt
+    await setDoc(ref, { id, createdAt: Date.now(), mastery })
+  }
 }
 
 // 取消收藏
