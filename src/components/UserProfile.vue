@@ -115,11 +115,19 @@
                 <div ref="pieTypePracticeRef" style="flex:1;min-width:260px;height:400px;background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(244,63,94,0.08);"></div>
             </div>
         </div>
+        <canvas v-if="showFirework" ref="fireworkCanvas" class="firework-canvas"></canvas>
+        <div v-if="showPraise" class="praise-tip animate__animated" :class="praiseAnimClass">
+            {{ praiseText }}
+        </div>
+        <div v-if="comboCount > 1 && showComboTip" class="combo-tip animate__animated animate__tada" :class="comboFlashClass">
+            完美翻译
+            {{ comboCount }} 连击！！！！
+        </div>
     </div>
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, onUnmounted } from 'vue';
+import { ref, onMounted, nextTick, onUnmounted, computed } from 'vue';
 import { getAuth } from 'firebase/auth';
 import { getAllFavorites } from '../services/favorites';
 import { getAllLearned } from '../services/learned.js';
@@ -130,6 +138,8 @@ import { collection, getDocs } from 'firebase/firestore';
 import { fetchNotesCount } from '../services/notes.js';
 import { getAllPracticeLogs, getTodayPracticeLogs, subscribeToPracticeLogs } from '../services/practiceLogs'
 import * as echarts from 'echarts'
+import confetti from 'canvas-confetti'
+import 'animate.css'
 
 const userEmail = ref('');
 const favoriteIds = ref([]);
@@ -168,6 +178,14 @@ const hourChartBoxStyle = `
 const pieTypeCountRef = ref(null)
 const pieTypePracticeRef = ref(null)
 const scoreChartRef = ref(null)
+const showFirework = ref(false)
+const showPraise = ref(false)
+const showComboTip = ref(false)
+const praiseText = ref('')
+const praiseAnimClass = ref('animate__bounceInRight')
+const comboCount = ref(0)
+let comboTimer = null
+const lastComboScore = ref(false)
 
 let unsubscribe = null;
 const charts = {
@@ -178,6 +196,14 @@ const charts = {
   scoreChart: null
 }
 let currentLogs = []; // 存储当前练习数据
+
+const comboFlashClass = computed(() => {
+  if (comboCount.value >= 5) return 'combo-flash-5';
+  if (comboCount.value === 4) return 'combo-flash-4';
+  if (comboCount.value === 3) return 'combo-flash-3';
+  if (comboCount.value === 2) return 'combo-flash-2';
+  return '';
+});
 
 // 更新图表的函数
 function updateCharts(allLogs) {
@@ -206,6 +232,7 @@ function updateCharts(allLogs) {
   // 评分数据
   const scoreData = [];
   let practiceIndex = 1;
+  let lastScore = null;
 
   allLogs.forEach(log => {
     if (!log.timestamp) return;
@@ -231,6 +258,7 @@ function updateCharts(allLogs) {
         questionNumber: log.questionNumber || '',
         questionTitle: log.questionTitle || ''
       });
+      lastScore = log.score;
     }
     practiceIndex++;
   });
@@ -299,6 +327,36 @@ function updateCharts(allLogs) {
       series: [{ data: scoreData }],
       dataZoom
     });
+  }
+
+  // 评分特效逻辑
+  if (scoreData.length > 0) {
+    const latestScore = scoreData[scoreData.length - 1].value[1];
+    const prevScore = scoreData.length > 1 ? scoreData[scoreData.length - 2].value[1] : null;
+    console.log('最新评分:', latestScore, '上一个评分:', prevScore, 'comboCount:', comboCount.value);
+
+    if (latestScore > 80) {
+      triggerFirework();
+      if (prevScore !== null && prevScore > 80) {
+        comboCount.value++;
+        showComboTip.value = false;
+        nextTick(() => {
+          showComboTip.value = true;
+          setTimeout(() => { showComboTip.value = false }, 2000);
+        });
+        console.log('连击触发，comboCount:', comboCount.value);
+        // 连击时不再显示"完美翻译"
+      } else {
+        comboCount.value = 1;
+        showPraiseTip('太棒了！完美的翻译');
+        console.log('首次高分，显示完美翻译');
+      }
+      // 不再设置combo计时器
+    } else {
+      comboCount.value = 0;
+      showComboTip.value = false;
+      console.log('评分未达标，comboCount归零');
+    }
   }
 }
 
@@ -685,6 +743,27 @@ function goToFavorites() {
 function closeHourChart() {
     showHourChart.value = false;
 }
+
+function triggerFirework() {
+  showFirework.value = true
+  // 多点烟花
+  for (let i = 0; i < 5; i++) {
+    setTimeout(() => {
+      confetti({ origin: { x: Math.random(), y: Math.random() * 0.7 }, particleCount: 80, spread: 70 })
+    }, i * 200)
+  }
+  setTimeout(() => { showFirework.value = false }, 2000)
+}
+
+function showPraiseTip(text) {
+  praiseText.value = text
+  showPraise.value = true
+  praiseAnimClass.value = 'animate__bounceInRight'
+  setTimeout(() => {
+    praiseAnimClass.value = 'animate__fadeOutRight'
+    setTimeout(() => { showPraise.value = false }, 800)
+  }, 1800)
+}
 </script>
 
 <style scoped>
@@ -847,5 +926,60 @@ function closeHourChart() {
 .charts-section {
   margin-top: 48px;
   margin-bottom: 32px;
+}
+.firework-canvas {
+  position: fixed;
+  left: 0; top: 0; width: 100vw; height: 100vh;
+  pointer-events: none; z-index: 9999;
+}
+.praise-tip {
+  position: fixed; right: 40px; top: 40px;
+  background: #fff; color: #2563eb; font-size: 28px; font-weight: bold;
+  border-radius: 12px; box-shadow: 0 4px 16px rgba(59,130,246,0.12);
+  padding: 18px 36px; z-index: 10000;
+}
+.combo-tip {
+  position: fixed; right: 60px; top: 100px;
+  color: #f43f5e; font-size: 40px; font-weight: bold;
+  text-shadow: 0 2px 8px #fff, 0 4px 24px #f43f5e44;
+  z-index: 10001;
+}
+@keyframes flash2 {
+  0%, 100% { color: #f43f5e; text-shadow: 0 2px 8px #fff, 0 4px 24px #f43f5e44; }
+  50% { color: #fff; text-shadow: 0 2px 16px #f43f5e, 0 4px 32px #fff; }
+}
+@keyframes flash3 {
+  0%, 100% { color: #f59e42; text-shadow: 0 2px 12px #fff, 0 4px 32px #f59e4244; }
+  50% { color: #fff; text-shadow: 0 2px 24px #f59e42, 0 4px 48px #fff; }
+}
+@keyframes flash4 {
+  0%, 100% { color: #22c55e; text-shadow: 0 2px 16px #fff, 0 4px 40px #22c55e44; }
+  50% { color: #fff; text-shadow: 0 2px 32px #22c55e, 0 4px 64px #fff; }
+}
+@keyframes flash5 {
+  0% { color: #fff; background: linear-gradient(90deg, #f43f5e, #f59e42, #22c55e, #3b82f6, #f43f5e); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 16px #fff); }
+  25% { color: #fff; background: linear-gradient(90deg, #3b82f6, #f43f5e, #f59e42, #22c55e, #3b82f6); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 32px #f59e42); }
+  50% { color: #fff; background: linear-gradient(90deg, #22c55e, #3b82f6, #f43f5e, #f59e42, #22c55e); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 48px #22c55e); }
+  75% { color: #fff; background: linear-gradient(90deg, #f59e42, #22c55e, #3b82f6, #f43f5e, #f59e42); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 64px #3b82f6); }
+  100% { color: #fff; background: linear-gradient(90deg, #f43f5e, #f59e42, #22c55e, #3b82f6, #f43f5e); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 80px #f43f5e); }
+}
+.combo-flash-2 {
+  animation: flash2 0.7s infinite;
+}
+.combo-flash-3 {
+  animation: flash3 0.5s infinite;
+  font-size: 48px;
+}
+.combo-flash-4 {
+  animation: flash4 0.4s infinite;
+  font-size: 56px;
+  letter-spacing: 2px;
+}
+.combo-flash-5 {
+  animation: flash5 0.3s infinite linear;
+  font-size: 64px;
+  letter-spacing: 4px;
+  font-weight: 900;
+  filter: brightness(1.2) drop-shadow(0 0 24px #fff);
 }
 </style>
