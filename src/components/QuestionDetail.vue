@@ -358,6 +358,7 @@ import { getAuth, onAuthStateChanged } from 'firebase/auth' // 导入 Firebase A
 import { uploadAudioToLambda } from '@/services/googleDrive'
 import autosize from 'autosize'
 import { nextTick } from 'vue'
+import { addPracticeLog } from '@/services/practiceLogs'
 
 const route = useRoute()
 const router = useRouter()
@@ -892,7 +893,21 @@ async function startRecording(dialogId) {
           await uploadAudioToLambda(wavBlob, filename)
         } catch (err) {}
       })
-
+      // === 新增：记录练习日志 ===
+      try {
+        // 提取AI评分
+        const score = extractScore(aiCheckResult);
+        await addPracticeLog(
+          route.params.qid,
+          pageTitle.value,
+          pageQid.value,
+          pageType.value,
+          score ? parseInt(score) : null
+        )
+      } catch (e) {
+        console.error('记录练习日志失败', e)
+      }
+      // ===
       if (!recordingsList.value[dialogId]) recordingsList.value[dialogId] = []
       recordingsList.value[dialogId].push({
         url,
