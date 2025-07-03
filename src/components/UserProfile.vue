@@ -672,7 +672,12 @@ onMounted(async () => {
                     symbol: 'circle',
                     symbolSize: 8,
                     lineStyle: {
-                        color: '#3b82f6',
+                        color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                            { offset: 0, color: 'rgba(244,63,94,0.95)' },    // 红
+                            { offset: 0.33, color: 'rgba(245,158,66,0.88)' },// 橙
+                            { offset: 0.66, color: 'rgba(34,197,94,0.82)' }, // 绿
+                            { offset: 1, color: 'rgba(59,130,246,0.78)' }    // 蓝
+                        ]),
                         width: 4,
                         shadowColor: 'rgba(59, 130, 246, 0.3)',
                         shadowBlur: 10
@@ -685,15 +690,12 @@ onMounted(async () => {
                         shadowBlur: 8
                     },
                     areaStyle: {
-                        color: {
-                            type: 'linear',
-                            x: 0, y: 0, x2: 0, y2: 1,
-                            colorStops: [
-                                { offset: 0, color: 'rgba(59, 130, 246, 0.25)' },
-                                { offset: 0.7, color: 'rgba(59, 130, 246, 0.1)' },
-                                { offset: 1, color: 'rgba(59, 130, 246, 0.02)' }
-                            ]
-                        }
+                        color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                            { offset: 0, color: 'rgba(244,63,94,0.95)' },    // 红
+                            { offset: 0.33, color: 'rgba(245,158,66,0.88)' },// 橙
+                            { offset: 0.66, color: 'rgba(34,197,94,0.82)' }, // 绿
+                            { offset: 1, color: 'rgba(59,130,246,0.78)' }    // 蓝
+                        ])
                     }
                 }]
             });
