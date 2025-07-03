@@ -896,13 +896,18 @@ async function startRecording(dialogId) {
       // === 新增：记录练习日志 ===
       try {
         // 提取AI评分
-        const score = extractScore(aiCheckResult);
-        const accuracy = extractAccuracy(aiCheckResult);
-        const accuracyMax = extractAccuracyMax(aiCheckResult);
-        const fluency = extractFluency(aiCheckResult);
-        const fluencyMax = extractFluencyMax(aiCheckResult);
-        const grammar = extractGrammar(aiCheckResult);
-        const grammarMax = extractGrammarMax(aiCheckResult);
+        let score = extractScore(aiCheckResult);
+        let accuracy = extractAccuracy(aiCheckResult);
+        let accuracyMax = extractAccuracyMax(aiCheckResult);
+        let fluency = extractFluency(aiCheckResult);
+        let fluencyMax = extractFluencyMax(aiCheckResult);
+        let grammar = extractGrammar(aiCheckResult);
+        let grammarMax = extractGrammarMax(aiCheckResult);
+        // 单项为0分时赋1分
+        if (accuracy !== null && Number(accuracy) === 0) accuracy = 1;
+        if (fluency !== null && Number(fluency) === 0) fluency = 1;
+        if (grammar !== null && Number(grammar) === 0) grammar = 1;
+        if (score !== null && Number(score) === 0) score = 1;
         console.log('[AI评分原文]', aiCheckResult);
         console.log('[能力分提取]', {score, accuracy, accuracyMax, fluency, fluencyMax, grammar, grammarMax});
         await addPracticeLog(

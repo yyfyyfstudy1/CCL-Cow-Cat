@@ -1,6 +1,7 @@
 import { db } from './firebase';
 import { getAuth } from 'firebase/auth';
-import { collection, addDoc, serverTimestamp, getDocs, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, setDoc, doc, serverTimestamp, getDocs, getDoc, query, where, onSnapshot } from 'firebase/firestore';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * 记录一次练习
@@ -19,7 +20,9 @@ import { collection, addDoc, serverTimestamp, getDocs, query, where, onSnapshot 
 export async function addPracticeLog(questionId, questionTitle = '', questionNumber = '', questionType = '', score = null, accuracy = null, accuracyMax = null, fluency = null, fluencyMax = null, grammar = null, grammarMax = null) {
   const user = getAuth().currentUser;
   if (!user) throw new Error('未登录');
+  const logId = uuidv4();
   const logData = {
+    id: logId,
     questionId,
     questionTitle,
     questionNumber,
@@ -50,7 +53,8 @@ export async function addPracticeLog(questionId, questionTitle = '', questionNum
     logData.grammarMax = grammarMax;
   }
   
-  await addDoc(collection(db, 'users', user.uid, 'practiceLogs'), logData);
+  await setDoc(doc(db, 'users', user.uid, 'practiceLogs', logId), logData);
+  return logId;
 }
 
 // 获取所有练习记录
@@ -100,4 +104,13 @@ export function subscribeToPracticeLogs(callback) {
   );
   
   return unsubscribe;
+}
+
+// 按ID获取单条日志
+export async function getPracticeLogById(logId) {
+  const user = getAuth().currentUser;
+  if (!user) throw new Error('未登录');
+  const ref = doc(db, 'users', user.uid, 'practiceLogs', logId);
+  const snap = await getDoc(ref);
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 } 

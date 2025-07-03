@@ -364,15 +364,28 @@ function updateCharts(allLogs) {
 }
 
 function updateRadarChart(logs) {
-  // 调试日志
-  console.log('[雷达图] 所有日志:', logs);
-  // 取最近5条有能力分的记录，按时间倒序
-  const validLogs = logs.filter(l => l.accuracy && l.accuracyMax && l.fluency && l.fluencyMax && l.grammar && l.grammarMax)
+  // 先按id去重
+  const uniqueMap = new Map();
+  logs.forEach(l => {
+    if (l.id && !uniqueMap.has(l.id)) uniqueMap.set(l.id, l);
+  });
+  // 时间格式化函数
+  function getTimeStr(ts) {
+    let dateObj;
+    if (ts?.toDate) dateObj = ts.toDate();
+    else if (ts?.seconds) dateObj = new Date(ts.seconds * 1000);
+    else dateObj = new Date(ts);
+    return dateObj.toTimeString().slice(0, 8);
+  }
+  const validLogs = Array.from(uniqueMap.values())
+    .filter(l => l.accuracy && l.accuracyMax && l.fluency && l.fluencyMax && l.grammar && l.grammarMax)
     .sort((a, b) => {
       const ta = a.timestamp?.seconds ? a.timestamp.seconds : (a.timestamp?.toDate ? a.timestamp.toDate().getTime() / 1000 : 0);
       const tb = b.timestamp?.seconds ? b.timestamp.seconds : (b.timestamp?.toDate ? b.timestamp.toDate().getTime() / 1000 : 0);
       return tb - ta;
-    }).slice(0, 5).reverse(); // 取最新5条，按时间正序
+    })
+    .slice(0, 5)
+    .reverse(); // 取最新5条，按时间正序
   console.log('[雷达图] 有效能力分日志:', validLogs);
   if (!radarChartRef.value) return;
   if (!radarChart) radarChart = echarts.init(radarChartRef.value);
@@ -406,12 +419,12 @@ function updateRadarChart(logs) {
   });
   console.log('[雷达图] seriesData:', seriesData);
   radarChart.setOption({
-    title: { text: '最近5次练习能力雷达图', left: 'center', top: 20, textStyle: { fontSize: 16, color: '#3b82f6', fontWeight: 'bold', textShadow: '0 2px 8px #a5b4fc' } },
+    title: { text: '最近练习能力图', left: 'center', top: 20, textStyle: { fontSize: 16, color: '#3b82f6', fontWeight: 'bold', textShadow: '0 2px 8px #a5b4fc' } },
     tooltip: { trigger: 'item' },
     legend: {
       bottom: 24,
       left: 'center',
-      data: validLogs.map((l, i) => `${logs.length - validLogs.length + i + 1}次`),
+      data: validLogs.map(l => getTimeStr(l.timestamp)),
       textStyle: { fontSize: 15, color: '#6366f1', fontWeight: 'bold', textShadow: '0 2px 8px #a5b4fc' }
     },
     radar: {
@@ -428,7 +441,7 @@ function updateRadarChart(logs) {
       type: 'radar',
       data: seriesData.map((d, i) => ({
         value: d,
-        name: `${logs.length - validLogs.length + i + 1}次`,
+        name: getTimeStr(validLogs[i].timestamp),
         lineStyle: { color: colorList[i % colorList.length], width: 5 },
         itemStyle: {
           color: colorList[i % colorList.length],
