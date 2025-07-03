@@ -110,7 +110,7 @@
             </teleport>
             <div ref="barTopQuestionsRef" style="width:100%;height:320px;background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(245,158,66,0.08);"></div>
             <div ref="scoreChartRef" style="width:100%;height:320px;background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(59,130,246,0.08);margin-top:32px;"></div>
-            <div style="display:flex;gap:32px;margin-top:32px;flex-wrap:wrap;">
+            <div style="display:flex;gap:16px;margin-top:32px;flex-wrap:wrap;align-items:flex-start;">
                 <div ref="pieTypeCountRef" style="flex:1 1 0;min-width:340px;height:480px;background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(99,102,241,0.08);"></div>
                 <div ref="pieTypePracticeRef" style="flex:1 1 0;min-width:340px;height:480px;background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(244,63,94,0.08);"></div>
                 <div ref="radarChartRef" style="flex:1 1 0;min-width:340px;height:480px;background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(59,130,246,0.08);"></div>
@@ -336,7 +336,7 @@ function updateCharts(allLogs) {
   if (scoreData.length > 0) {
     const latestScore = scoreData[scoreData.length - 1].value[1];
     const prevScore = scoreData.length > 1 ? scoreData[scoreData.length - 2].value[1] : null;
-
+    console.log('最新评分:', latestScore, '上一个评分:', prevScore, 'comboCount:', comboCount.value);
 
     if (latestScore > 80) {
       triggerFirework();
@@ -347,25 +347,25 @@ function updateCharts(allLogs) {
           showComboTip.value = true;
           setTimeout(() => { showComboTip.value = false }, 2000);
         });
-
+        console.log('连击触发，comboCount:', comboCount.value);
         // 连击时不再显示"完美翻译"
       } else {
         comboCount.value = 1;
         showPraiseTip('太棒了！完美的翻译');
-
+        console.log('首次高分，显示完美翻译');
       }
       // 不再设置combo计时器
     } else {
       comboCount.value = 0;
       showComboTip.value = false;
-
+      console.log('评分未达标，comboCount归零');
     }
   }
 }
 
 function updateRadarChart(logs) {
   // 调试日志
-  // console.log('[雷达图] 所有日志:', logs);
+  console.log('[雷达图] 所有日志:', logs);
   // 取最近5条有能力分的记录，按时间倒序
   const validLogs = logs.filter(l => l.accuracy && l.accuracyMax && l.fluency && l.fluencyMax && l.grammar && l.grammarMax)
     .sort((a, b) => {
@@ -373,7 +373,7 @@ function updateRadarChart(logs) {
       const tb = b.timestamp?.seconds ? b.timestamp.seconds : (b.timestamp?.toDate ? b.timestamp.toDate().getTime() / 1000 : 0);
       return tb - ta;
     }).slice(0, 5).reverse(); // 取最新5条，按时间正序
-  // console.log('[雷达图] 有效能力分日志:', validLogs);
+  console.log('[雷达图] 有效能力分日志:', validLogs);
   if (!radarChartRef.value) return;
   if (!radarChart) radarChart = echarts.init(radarChartRef.value);
   if (logs.length === 0 || (!logs.some(l => l.accuracy && l.accuracyMax && l.fluency && l.fluencyMax && l.grammar && l.grammarMax))) {
@@ -401,10 +401,10 @@ function updateRadarChart(logs) {
     // 保留两位小数
     const fix = v => v !== undefined && v !== null ? Number(v).toFixed(2) * 1 : 0;
     const t = fix(total), a = fix(acc), f = fix(flu), g = fix(gra);
-    // console.log(`[雷达图] 能力分: 总分=${t}, 准确率=${a}, 自然度率=${f}, 语法率=${g}`, log);
+    console.log(`[雷达图] 能力分: 总分=${t}, 准确率=${a}, 自然度率=${f}, 语法率=${g}`, log);
     return [t, a, f, g];
   });
-  // console.log('[雷达图] seriesData:', seriesData);
+  console.log('[雷达图] seriesData:', seriesData);
   radarChart.setOption({
     title: { text: '最近5次练习能力雷达图', left: 'center', top: 20, textStyle: { fontSize: 16, color: '#3b82f6', fontWeight: 'bold', textShadow: '0 2px 8px #a5b4fc' } },
     tooltip: { trigger: 'item' },
@@ -804,12 +804,12 @@ onMounted(async () => {
         updateRadarChart([]);
 
     } catch (e) {
-
+        console.error("加载个人资料数据失败:", e);
         favoriteIds.value = [];
         learnedDialogCount.value = 0;
         listenedDialogCount.value = 0;
         notesCount.value = 0;
-        totalPracticeCount.value = 0;りい
+        totalPracticeCount.value = 0;
         todayPracticeCount.value = 0;
     }
 });

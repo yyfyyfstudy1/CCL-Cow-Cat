@@ -184,7 +184,7 @@
                                 ></textarea>
                             </div>
                         </div>
-
+                        
                         <!-- 智能补全显示 -->
                         <template v-if="showInlineCompletion[dialog.original.id] && inlineCompletion[dialog.original.id]">
                             <div class="completion-hint-top-outer">点击或按Tab下方提示框补全</div>
@@ -552,6 +552,12 @@ async function loadPageData() {
           }
         }
 
+        // 添加打印语句
+        console.log(`\n收藏对话 ${id} 的翻译内容：`)
+        console.log('原文：', originalRow?.text || '无原文')
+        console.log('翻译：', translationRow?.text || '无翻译')
+        console.log('-------------------')
+
         return {
           original: {
             text: originalRow?.text || '',
@@ -655,7 +661,7 @@ async function loadPageData() {
     }
 
   } catch (e) {
-
+    console.error('加载页面数据失败:', e)
     error.value = e.message
   }
 }
@@ -747,7 +753,7 @@ async function convertToWav(audioBlob) {
 
     return wavBlob
   } catch (err) {
-
+    console.error('音频转换失败:', err)
     return audioBlob // 如果转换失败，返回原始音频
   }
 }
@@ -897,8 +903,8 @@ async function startRecording(dialogId) {
         const fluencyMax = extractFluencyMax(aiCheckResult);
         const grammar = extractGrammar(aiCheckResult);
         const grammarMax = extractGrammarMax(aiCheckResult);
-        // console.log('[AI评分原文]', aiCheckResult);
-        // console.log('[能力分提取]', {score, accuracy, accuracyMax, fluency, fluencyMax, grammar, grammarMax});
+        console.log('[AI评分原文]', aiCheckResult);
+        console.log('[能力分提取]', {score, accuracy, accuracyMax, fluency, fluencyMax, grammar, grammarMax});
         await addPracticeLog(
           route.params.qid,
           pageTitle.value,
@@ -913,7 +919,7 @@ async function startRecording(dialogId) {
           grammarMax ? parseInt(grammarMax) : null
         )
       } catch (e) {
-
+        console.error('记录练习日志失败', e)
       }
       // ===
       if (!recordingsList.value[dialogId]) recordingsList.value[dialogId] = []
@@ -1044,9 +1050,9 @@ async function loadFavorites() {
     //   createdAt: item.createdAt
     // }));
 
-
+    console.log('收藏id及熟练度:', favoriteMasteries.value)
   } catch (e) {
-
+    console.error('加载收藏失败:', e)
     favoriteIds.value = []
     favoriteMasteries.value = {}
     // dialogs.value = [] // 加载失败时清空对话列表 - 这行也不再需要，因为dialogs由loadPageData负责
@@ -1080,16 +1086,16 @@ async function updateMastery(dialogId, newMastery) {
     // 如果当前是按熟练度排序，强制更新 dialogs.value 以触发 computed 重新计算。
     // 简单做法是重新赋值 dialogs.value，或者更新 dialogs.value 内部的元素。
     // 因为我们已经直接修改了 dialogToUpdate.mastery，Vue 会自动响应。
-
+    console.log(`对话 ${strId} 的熟练度已更新为 ${newMastery}`)
   } catch (e) {
-
+    console.error('更新熟练度失败:', e)
   }
 }
 
 // 新增：切换排序模式
 function toggleSortMode() {
   currentSortMode.value = currentSortMode.value === 'createdAt' ? 'mastery' : 'createdAt'
-
+  console.log(`排序模式已切换为: ${currentSortMode.value === 'createdAt' ? '添加时间' : '熟练度'}`)
 
   // 重新排序对话和录音
   if (isFavoritesMode.value) {
@@ -1125,7 +1131,7 @@ function toggleSortMode() {
 // 新增：切换排序方向
 function toggleSortOrder() {
   sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
-
+  console.log(`排序方向已切换为: ${sortOrder.value === 'desc' ? '降序' : '升序'}`)
 
   // 重新排序对话和录音
   if (isFavoritesMode.value) {
@@ -1164,9 +1170,9 @@ async function loadNotes(dialog) {
   if (!dialog || !dialog.original || !dialog.original.id) return; // 没有对话或ID则不加载笔记
   try {
     dialog.dialogNotes = await getNotes(dialog.original.id);
-
+    console.log(`对话 ${dialog.original.id} 的笔记已加载:`, dialog.dialogNotes);
   } catch (e) {
-
+    console.error(`加载对话 ${dialog.original.id} 笔记失败:`, e);
     notesError.value = e.message;
   }
 }
@@ -1182,7 +1188,7 @@ async function handleAddNote(dialog) {
     newNoteText.value[dialogId] = ''; // 清空输入框
     await loadNotes(dialog); // 重新加载笔记
   } catch (e) {
-
+    console.error(`添加笔记失败:`, e);
     notesError.value = e.message;
   }
 }
@@ -1207,7 +1213,7 @@ async function handleSaveNote(dialog, noteId) {
     editingNoteText.value = '';
     await loadNotes(dialog); // 重新加载笔记
   } catch (e) {
-
+    console.error(`更新笔记失败:`, e);
     notesError.value = e.message;
   }
 }
@@ -1227,7 +1233,7 @@ async function handleDeleteNote(dialog, noteId) {
     await deleteNote(dialogId, noteId);
     await loadNotes(dialog); // 重新加载笔记
   } catch (e) {
-
+    console.error(`删除笔记失败:`, e);
     notesError.value = e.message;
   }
 }
@@ -1249,30 +1255,30 @@ function toggleNotesSection(dialog) {
 async function getNoteSuggestion(dialog) {
   const dialogId = dialog.original.id;
   if (!dialogId) return;
-
+  
   try {
     isGettingSuggestions.value[dialogId] = true;
     suggestionError.value[dialogId] = null;
-
+    
     // 获取最新的录音和AI检查结果
     const dialogIndex = dialogs.value.findIndex(d => String(d.original.id) === String(dialogId));
-    const latestRecording = dialogIndex !== -1 ?
+    const latestRecording = dialogIndex !== -1 ? 
       recordingsList.value[dialogIndex]?.[recordingsList.value[dialogIndex].length - 1] : null;
     const aiCheckResult = latestRecording?.aiCheck || '';
-
+    
     const suggestion = await getNoteSuggestions(
       dialog.original.text,
       dialog.translation.text,
       aiCheckResult,
       newNoteText.value[dialogId] || ''
     );
-
+    
     // 提取笔记内容（去掉"笔记内容："前缀）
     const noteContent = suggestion.replace(/^笔记内容：/, '').trim();
     noteSuggestions.value[dialogId] = noteContent;
-
+    
   } catch (e) {
-
+    console.error('获取笔记提示失败:', e);
     suggestionError.value[dialogId] = '获取智能提示失败，请稍后重试';
   } finally {
     isGettingSuggestions.value[dialogId] = false;
@@ -1297,19 +1303,19 @@ function clearSuggestion(dialogId) {
 // 新增：处理笔记输入事件（智能补全）
 async function handleNoteInput(event, dialog) {
   const dialogId = dialog.original.id;
-
+  
   // 清除之前的定时器
   if (completionDebounceTimer.value[dialogId]) {
     clearTimeout(completionDebounceTimer.value[dialogId]);
   }
-
+  
   const text = event.target.value; // 获取当前输入框的最新文本
   // 如果输入内容为空，则隐藏补全提示
   if (!text || text.trim().length === 0) {
     hideInlineCompletion(dialogId);
     return;
   }
-
+  
   // 当输入字符过少时，不发送请求，避免频繁调用
   if (text.trim().length < 3) {
       return;
@@ -1327,7 +1333,7 @@ async function handleNoteInput(event, dialog) {
             hideInlineCompletion(dialogId);
         }
     } catch (e) {
-
+      console.error('获取智能补全失败:', e);
     }
   }, 250); // 延迟增加到 500ms
 }
@@ -1335,10 +1341,10 @@ async function handleNoteInput(event, dialog) {
 // 新增：处理笔记键盘事件（Tab键补全）
 function handleNoteKeydown(event, dialog) {
   const dialogId = dialog.original.id;
-
+  
   if (event.key === 'Tab') {
     event.preventDefault();
-
+    
     if (showInlineCompletion.value[dialogId] && inlineCompletion.value[dialogId]) {
       // 应用内联补全
       applyInlineCompletion(dialog);
@@ -1351,19 +1357,26 @@ function handleNoteKeydown(event, dialog) {
 // 新增：获取内联智能补全
 async function getInlineCompletion(dialog, currentText) {
   const dialogId = dialog.original.id;
-
+  
   try {
-
-
+    console.log('开始获取智能补全:', { dialogId, currentText });
+    
     // 获取最新的录音和AI检查结果
     // 需要找到对话在数组中的索引来获取录音数据
     const dialogIndex = dialogs.value.findIndex(d => String(d.original.id) === String(dialogId));
-    const latestRecording = dialogIndex !== -1 ?
+    const latestRecording = dialogIndex !== -1 ? 
       recordingsList.value[dialogIndex]?.[recordingsList.value[dialogIndex].length - 1] : null;
     const aiCheckResult = latestRecording?.aiCheck || '';
-
-
-
+    
+    console.log('获取到的上下文:', {
+      dialogIndex,
+      originalText: dialog.original.text,
+      translationText: dialog.translation.text,
+      aiCheckResult: aiCheckResult,
+      currentInput: currentText,
+      recordingsList: recordingsList.value[dialogIndex]
+    });
+    
     // 即使没有AI检查结果，也尝试提供智能补全
     // 基于原文、翻译和用户当前输入来生成补全
     const completion = await getSmartCompletion(
@@ -1372,20 +1385,20 @@ async function getInlineCompletion(dialog, currentText) {
       aiCheckResult,
       currentText
     );
-
-
-
+    
+    console.log('获取到的补全结果:', completion);
+    
     if (completion && completion.trim().length > 0) {
       inlineCompletion.value[dialogId] = completion;
       showInlineCompletion.value[dialogId] = true;
-
+      console.log('设置内联补全:', { dialogId, completion });
     } else {
       hideInlineCompletion(dialogId);
-
+      console.log('隐藏内联补全，无有效补全内容');
     }
-
+    
   } catch (e) {
-
+    console.error('获取智能补全失败:', e);
     hideInlineCompletion(dialogId);
   }
 }
