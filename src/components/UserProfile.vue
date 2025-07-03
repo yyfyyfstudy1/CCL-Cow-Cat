@@ -401,10 +401,10 @@ function updateRadarChart(logs) {
     '#60a5fa'  // 蓝
   ];
   const indicators = [
-    { name: '得分率', max: 1 },
-    { name: '准确率', max: 1 },
-    { name: '自然率', max: 1 },
-    { name: '语法率', max: 1 }
+    { name: '得分', max: 1 },
+    { name: '准确性', max: 1 },
+    { name: '自然度', max: 1 },
+    { name: '语法', max: 1 }
   ];
   const seriesData = validLogs.map(log => {
     const total = log.score ? (log.score / 100) : 0;
