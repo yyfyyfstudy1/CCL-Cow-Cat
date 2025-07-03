@@ -110,9 +110,10 @@
             </teleport>
             <div ref="barTopQuestionsRef" style="width:100%;height:320px;background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(245,158,66,0.08);"></div>
             <div ref="scoreChartRef" style="width:100%;height:320px;background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(59,130,246,0.08);margin-top:32px;"></div>
-            <div style="display:flex;gap:32px;margin-top:32px;">
-                <div ref="pieTypeCountRef" style="flex:1;min-width:260px;height:400px;background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(99,102,241,0.08);"></div>
-                <div ref="pieTypePracticeRef" style="flex:1;min-width:260px;height:400px;background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(244,63,94,0.08);"></div>
+            <div style="display:flex;gap:32px;margin-top:32px;flex-wrap:wrap;">
+                <div ref="pieTypeCountRef" style="flex:1 1 0;min-width:340px;height:480px;background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(99,102,241,0.08);"></div>
+                <div ref="pieTypePracticeRef" style="flex:1 1 0;min-width:340px;height:480px;background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(244,63,94,0.08);"></div>
+                <div ref="radarChartRef" style="flex:1 1 0;min-width:340px;height:480px;background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(59,130,246,0.08);"></div>
             </div>
         </div>
         <canvas v-if="showFirework" ref="fireworkCanvas" class="firework-canvas"></canvas>
@@ -186,6 +187,8 @@ const praiseAnimClass = ref('animate__bounceInRight')
 const comboCount = ref(0)
 let comboTimer = null
 const lastComboScore = ref(false)
+const radarChartRef = ref(null)
+let radarChart = null
 
 let unsubscribe = null;
 const charts = {
@@ -333,7 +336,7 @@ function updateCharts(allLogs) {
   if (scoreData.length > 0) {
     const latestScore = scoreData[scoreData.length - 1].value[1];
     const prevScore = scoreData.length > 1 ? scoreData[scoreData.length - 2].value[1] : null;
-    console.log('最新评分:', latestScore, '上一个评分:', prevScore, 'comboCount:', comboCount.value);
+
 
     if (latestScore > 80) {
       triggerFirework();
@@ -344,20 +347,109 @@ function updateCharts(allLogs) {
           showComboTip.value = true;
           setTimeout(() => { showComboTip.value = false }, 2000);
         });
-        console.log('连击触发，comboCount:', comboCount.value);
+
         // 连击时不再显示"完美翻译"
       } else {
         comboCount.value = 1;
         showPraiseTip('太棒了！完美的翻译');
-        console.log('首次高分，显示完美翻译');
+
       }
       // 不再设置combo计时器
     } else {
       comboCount.value = 0;
       showComboTip.value = false;
-      console.log('评分未达标，comboCount归零');
+
     }
   }
+}
+
+function updateRadarChart(logs) {
+  // 调试日志
+  // console.log('[雷达图] 所有日志:', logs);
+  // 取最近5条有能力分的记录，按时间倒序
+  const validLogs = logs.filter(l => l.accuracy && l.accuracyMax && l.fluency && l.fluencyMax && l.grammar && l.grammarMax)
+    .sort((a, b) => {
+      const ta = a.timestamp?.seconds ? a.timestamp.seconds : (a.timestamp?.toDate ? a.timestamp.toDate().getTime() / 1000 : 0);
+      const tb = b.timestamp?.seconds ? b.timestamp.seconds : (b.timestamp?.toDate ? b.timestamp.toDate().getTime() / 1000 : 0);
+      return tb - ta;
+    }).slice(0, 5).reverse(); // 取最新5条，按时间正序
+  // console.log('[雷达图] 有效能力分日志:', validLogs);
+  if (!radarChartRef.value) return;
+  if (!radarChart) radarChart = echarts.init(radarChartRef.value);
+  if (logs.length === 0 || (!logs.some(l => l.accuracy && l.accuracyMax && l.fluency && l.fluencyMax && l.grammar && l.grammarMax))) {
+    radarChart.clear();
+    return;
+  }
+  const colorList = [
+    '#6366f1', // 蓝紫
+    '#f472b6', // 粉
+    '#fbbf24', // 黄
+    '#34d399', // 绿
+    '#60a5fa'  // 蓝
+  ];
+  const indicators = [
+    { name: '得分率', max: 1 },
+    { name: '准确率', max: 1 },
+    { name: '自然率', max: 1 },
+    { name: '语法率', max: 1 }
+  ];
+  const seriesData = validLogs.map(log => {
+    const total = log.score ? (log.score / 100) : 0;
+    const acc = log.accuracy / log.accuracyMax;
+    const flu = log.fluency / log.fluencyMax;
+    const gra = log.grammar / log.grammarMax;
+    // 保留两位小数
+    const fix = v => v !== undefined && v !== null ? Number(v).toFixed(2) * 1 : 0;
+    const t = fix(total), a = fix(acc), f = fix(flu), g = fix(gra);
+    // console.log(`[雷达图] 能力分: 总分=${t}, 准确率=${a}, 自然度率=${f}, 语法率=${g}`, log);
+    return [t, a, f, g];
+  });
+  // console.log('[雷达图] seriesData:', seriesData);
+  radarChart.setOption({
+    title: { text: '最近5次练习能力雷达图', left: 'center', top: 20, textStyle: { fontSize: 16, color: '#3b82f6', fontWeight: 'bold', textShadow: '0 2px 8px #a5b4fc' } },
+    tooltip: { trigger: 'item' },
+    legend: {
+      bottom: 24,
+      left: 'center',
+      data: validLogs.map((l, i) => `${logs.length - validLogs.length + i + 1}次`),
+      textStyle: { fontSize: 15, color: '#6366f1', fontWeight: 'bold', textShadow: '0 2px 8px #a5b4fc' }
+    },
+    radar: {
+      indicator: indicators,
+      radius: 120,
+      splitNumber: 5,
+      axisName: { color: '#6366f1', fontSize: 13, fontWeight: 'bold', textShadow: '0 2px 8px #a5b4fc' },
+      splitLine: { lineStyle: { color: '#a5b4fc', width: 2, type: 'solid' } },
+      splitArea: { areaStyle: { color: ['rgba(99,102,241,0.06)', '#fff'] } },
+      axisLine: { lineStyle: { color: '#a5b4fc', width: 2 } }
+    },
+    series: [{
+      name: '能力得分率',
+      type: 'radar',
+      data: seriesData.map((d, i) => ({
+        value: d,
+        name: `${logs.length - validLogs.length + i + 1}次`,
+        lineStyle: { color: colorList[i % colorList.length], width: 5 },
+        itemStyle: {
+          color: colorList[i % colorList.length],
+          borderColor: '#fff',
+          borderWidth: 3,
+          shadowBlur: 16,
+          shadowColor: colorList[i % colorList.length] + '55'
+        },
+        areaStyle: {
+          opacity: 0.08,
+          color: colorList[i % colorList.length]
+        },
+        emphasis: {
+          lineStyle: { width: 7, color: colorList[i % colorList.length] },
+          itemStyle: { color: colorList[i % colorList.length], borderColor: '#6366f1', borderWidth: 5 }
+        }
+      })),
+      symbol: 'circle',
+      symbolSize: 12
+    }]
+  });
 }
 
 onMounted(async () => {
@@ -564,9 +656,9 @@ onMounted(async () => {
         if (pieTypeCountRef.value) {
             charts.pieTypeCount = echarts.init(pieTypeCountRef.value);
             charts.pieTypeCount.setOption({
-                title: { text: '不同类型题目数量分布', left: 'center', top: 20, textStyle: { fontSize: 14, color: '#6366f1' } },
+                title: { text: '不同类型题目数量分布', left: 'center', top: 20, textStyle: { fontSize: 16, color: '#6366f1', fontWeight: 'bold' } },
                 tooltip: { trigger: 'item' },
-                legend: { bottom: 2, left: 'center' },
+                legend: { bottom: 24, left: 'center' },
                 series: [{
                     name: '题目数量',
                     type: 'pie',
@@ -590,36 +682,30 @@ onMounted(async () => {
             });
         }
 
-        // 饼图：类型-练习次数（Nightingale玫瑰图）
+        // 饼图：类型-练习次数（普通环形饼图）
         if (pieTypePracticeRef.value) {
             charts.pieTypePractice = echarts.init(pieTypePracticeRef.value);
             charts.pieTypePractice.setOption({
-                title: { text: '不同类型题目练习次数分布', left: 'center', top: 20, textStyle: { fontSize: 14, color: '#f43f5e' } },
+                title: { text: '不同类型题目练习次数分布', left: 'center', top: 20, textStyle: { fontSize: 16, color: '#f43f5e', fontWeight: 'bold' } },
                 tooltip: { trigger: 'item' },
-                legend: { bottom: 2, left: 'center' },
+                legend: { bottom: 24, left: 'center' },
                 series: [{
                     name: '练习次数',
                     type: 'pie',
-                    radius: [30, 120],
+                    radius: ['35%', '65%'],
                     center: ['50%', '55%'],
-                    roseType: 'area',
-                    itemStyle: {
-                        borderRadius: 12,
-                        borderColor: '#fff',
-                        borderWidth: 2,
-                        shadowBlur: 16,
-                        shadowColor: 'rgba(244,63,94,0.18)'
-                    },
+                    avoidLabelOverlap: true,
+                    itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
                     label: {
                         show: true,
-                        fontSize: 13,
-                        color: '#f43f5e',
+                        position: 'outside',
+                        fontSize: 12,
                         formatter: '{b}: {c}'
                     },
                     labelLine: {
                         show: true,
-                        length: 18,
-                        length2: 12
+                        length: 15,
+                        length2: 10
                     },
                     data: []
                 }]
@@ -710,15 +796,20 @@ onMounted(async () => {
         // 设置实时监听
         unsubscribe = subscribeToPracticeLogs((logs) => {
             updateCharts(logs);
+            updateRadarChart(logs);
         });
 
+        // 初始化雷达图
+        await nextTick();
+        updateRadarChart([]);
+
     } catch (e) {
-        console.error("加载个人资料数据失败:", e);
+
         favoriteIds.value = [];
         learnedDialogCount.value = 0;
         listenedDialogCount.value = 0;
         notesCount.value = 0;
-        totalPracticeCount.value = 0;
+        totalPracticeCount.value = 0;りい
         todayPracticeCount.value = 0;
     }
 });
@@ -741,6 +832,10 @@ onUnmounted(() => {
     }
     if (charts.scoreChart) {
         charts.scoreChart.dispose();
+    }
+    if (radarChart) {
+        radarChart.dispose();
+        radarChart = null;
     }
 });
 

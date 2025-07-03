@@ -9,8 +9,14 @@ import { collection, addDoc, serverTimestamp, getDocs, query, where, onSnapshot 
  * @param {string|number} questionNumber 题号
  * @param {string} questionType 题目类型
  * @param {number} score AI评分
+ * @param {number} accuracy 准确分
+ * @param {number} accuracyMax 准确分满分
+ * @param {number} fluency 自然度分
+ * @param {number} fluencyMax 自然度满分
+ * @param {number} grammar 语法分
+ * @param {number} grammarMax 语法满分
  */
-export async function addPracticeLog(questionId, questionTitle = '', questionNumber = '', questionType = '', score = null) {
+export async function addPracticeLog(questionId, questionTitle = '', questionNumber = '', questionType = '', score = null, accuracy = null, accuracyMax = null, fluency = null, fluencyMax = null, grammar = null, grammarMax = null) {
   const user = getAuth().currentUser;
   if (!user) throw new Error('未登录');
   const logData = {
@@ -24,6 +30,24 @@ export async function addPracticeLog(questionId, questionTitle = '', questionNum
   // 只有当评分存在且有效时才添加
   if (score !== null && score !== undefined && !isNaN(score)) {
     logData.score = score;
+  }
+  if (accuracy !== null && !isNaN(accuracy)) {
+    logData.accuracy = accuracy;
+  }
+  if (accuracyMax !== null && !isNaN(accuracyMax)) {
+    logData.accuracyMax = accuracyMax;
+  }
+  if (fluency !== null && !isNaN(fluency)) {
+    logData.fluency = fluency;
+  }
+  if (fluencyMax !== null && !isNaN(fluencyMax)) {
+    logData.fluencyMax = fluencyMax;
+  }
+  if (grammar !== null && !isNaN(grammar)) {
+    logData.grammar = grammar;
+  }
+  if (grammarMax !== null && !isNaN(grammarMax)) {
+    logData.grammarMax = grammarMax;
   }
   
   await addDoc(collection(db, 'users', user.uid, 'practiceLogs'), logData);
