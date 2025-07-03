@@ -590,7 +590,7 @@ onMounted(async () => {
             });
         }
 
-        // 饼图：类型-练习次数
+        // 饼图：类型-练习次数（Nightingale玫瑰图）
         if (pieTypePracticeRef.value) {
             charts.pieTypePractice = echarts.init(pieTypePracticeRef.value);
             charts.pieTypePractice.setOption({
@@ -600,20 +600,26 @@ onMounted(async () => {
                 series: [{
                     name: '练习次数',
                     type: 'pie',
-                    radius: ['35%', '65%'],
+                    radius: [30, 120],
                     center: ['50%', '55%'],
-                    avoidLabelOverlap: true,
-                    itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
+                    roseType: 'area',
+                    itemStyle: {
+                        borderRadius: 12,
+                        borderColor: '#fff',
+                        borderWidth: 2,
+                        shadowBlur: 16,
+                        shadowColor: 'rgba(244,63,94,0.18)'
+                    },
                     label: {
                         show: true,
-                        position: 'outside',
-                        fontSize: 12,
+                        fontSize: 13,
+                        color: '#f43f5e',
                         formatter: '{b}: {c}'
                     },
                     labelLine: {
                         show: true,
-                        length: 15,
-                        length2: 10
+                        length: 18,
+                        length2: 12
                     },
                     data: []
                 }]

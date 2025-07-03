@@ -18,6 +18,11 @@
                 <button @click="openFeedback" class="icon-button" title="反馈">
                     <span class="material-icons">campaign</span>
                 </button>
+                <button v-if="!isMobile" @click="toggleFullScreen" class="icon-button" title="全屏/还原">
+                    <span class="material-icons">
+                        {{ isFullScreen ? 'fullscreen_exit' : 'fullscreen' }}
+                    </span>
+                </button>
                 <UserAvatar />
             </div>
         </div>
@@ -27,8 +32,63 @@
 <script setup>
 import UserAvatar from './UserAvatar.vue';
 import { useEventBus } from '../services/eventBus.js';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 
 const { emit } = useEventBus();
+
+const isFullScreen = ref(false);
+
+const isMobile = computed(() => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+});
+
+function toggleFullScreen() {
+    if (!isFullScreen.value) {
+        const el = document.documentElement;
+        if (el.requestFullscreen) {
+            el.requestFullscreen();
+        } else if (el.webkitRequestFullscreen) {
+            el.webkitRequestFullscreen();
+        } else if (el.mozRequestFullScreen) {
+            el.mozRequestFullScreen();
+        } else if (el.msRequestFullscreen) {
+            el.msRequestFullscreen();
+        }
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        }
+    }
+}
+
+function fullscreenChangeHandler() {
+    isFullScreen.value = !!(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+    );
+}
+
+onMounted(() => {
+    document.addEventListener('fullscreenchange', fullscreenChangeHandler);
+    document.addEventListener('webkitfullscreenchange', fullscreenChangeHandler);
+    document.addEventListener('mozfullscreenchange', fullscreenChangeHandler);
+    document.addEventListener('MSFullscreenChange', fullscreenChangeHandler);
+});
+
+onUnmounted(() => {
+    document.removeEventListener('fullscreenchange', fullscreenChangeHandler);
+    document.removeEventListener('webkitfullscreenchange', fullscreenChangeHandler);
+    document.removeEventListener('mozfullscreenchange', fullscreenChangeHandler);
+    document.removeEventListener('MSFullscreenChange', fullscreenChangeHandler);
+});
 
 const startGuide = () => {
     emit('start-user-guide');
