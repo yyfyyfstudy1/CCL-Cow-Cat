@@ -124,6 +124,20 @@
             完美翻译
             {{ comboCount }} 连击！！！！
         </div>
+        
+        <!-- 3D模型组件 -->
+        <FloatingModel 
+            v-if="!isMobile"
+            ref="floatingModel"
+            :model-url="modelUrl"
+            :model-type="modelType"
+            :size="modelSize"
+            :position="modelPosition"
+        />
+        <div v-if="!isMobile && modelDialog" class="model-dialog-bubble">
+            {{ modelDialog }}
+            <span class="bubble-arrow"></span>
+        </div>
     </div>
 </template>
 
@@ -141,6 +155,7 @@ import { getAllPracticeLogs, getTodayPracticeLogs, subscribeToPracticeLogs } fro
 import * as echarts from 'echarts'
 import confetti from 'canvas-confetti'
 import 'animate.css'
+import FloatingModel from './FloatingModel.vue'
 
 const userEmail = ref('');
 const favoriteIds = ref([]);
@@ -189,6 +204,16 @@ let comboTimer = null
 const lastComboScore = ref(false)
 const radarChartRef = ref(null)
 let radarChart = null
+const floatingModel = ref(null)
+const modelDialog = ref('')
+let modelDialogTimer = null
+const isMobile = ref(false)
+
+// 3D模型配置
+const modelUrl = ref('/models/test3.glb') // 留空将显示默认几何体，或设置为您的模型文件路径如 '/models/your-model.glb'
+const modelType = ref('gltf') // 'gltf' 或 'fbx'
+const modelSize = ref(250)
+const modelPosition = ref({ x: 20, y: 20 }) // 距离左下角的距离
 
 let unsubscribe = null;
 const charts = {
@@ -354,11 +379,32 @@ function updateCharts(allLogs) {
         showPraiseTip('太棒了！完美的翻译');
         console.log('首次高分，显示完美翻译');
       }
-      // 不再设置combo计时器
+      // 新增：高分/低分时播放一次对应动画，结束后切回待机动画2
+      if (floatingModel.value && floatingModel.value.playAnimation) {
+        // 成功动画4（index=3）
+        floatingModel.value.playAnimation(3, true, () => {
+          floatingModel.value.playAnimation(1);
+        });
+      }
+      // 对话弹窗
+      modelDialog.value = '老铁666';
+      if (modelDialogTimer) clearTimeout(modelDialogTimer);
+      modelDialogTimer = setTimeout(() => { modelDialog.value = ''; }, 3000);
     } else {
       comboCount.value = 0;
       showComboTip.value = false;
       console.log('评分未达标，comboCount归零');
+      // 新增：高分/低分时播放一次对应动画，结束后切回待机动画2
+      if (floatingModel.value && floatingModel.value.playAnimation) {
+        // 失败动画1（index=0）
+        floatingModel.value.playAnimation(0, true, () => {
+          floatingModel.value.playAnimation(1);
+        });
+      }
+      // 对话弹窗
+      modelDialog.value = '老弟，你行不行啊';
+      if (modelDialogTimer) clearTimeout(modelDialogTimer);
+      modelDialogTimer = setTimeout(() => { modelDialog.value = ''; }, 3000);
     }
   }
 }
@@ -816,6 +862,8 @@ onMounted(async () => {
         await nextTick();
         updateRadarChart([]);
 
+        isMobile.value = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
     } catch (e) {
         console.error("加载个人资料数据失败:", e);
         favoriteIds.value = [];
@@ -1097,5 +1145,38 @@ function showPraiseTip(text) {
   letter-spacing: 4px;
   font-weight: 900;
   filter: brightness(1.2) drop-shadow(0 0 24px #fff);
+}
+.model-dialog-bubble {
+  position: fixed;
+  left: 260px;
+  bottom: 180px;
+  background: #fff;
+  color: #222;
+  font-size: 22px;
+  font-weight: bold;
+  border-radius: 24px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 18px 32px;
+  z-index: 10001;
+  border: 2.5px solid #2563eb;
+  user-select: none;
+  pointer-events: none;
+  animation: popIn 0.3s;
+  min-width: 120px;
+  text-align: center;
+}
+.model-dialog-bubble .bubble-arrow {
+  position: absolute;
+  left: -28px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 18px solid transparent;
+  border-bottom: 18px solid transparent;
+  border-right: 24px solid #2563eb;
+  /* 纯色蓝色箭头 */
+  filter: none;
+  content: '';
 }
 </style>
