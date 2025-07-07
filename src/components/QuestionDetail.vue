@@ -641,6 +641,23 @@ async function loadCurrentPageDialogs() {
       type: originalRow?.type || ''
     }
   })
+
+  // 分页切换时重置局部状态
+  dialogStates.value = {}
+  showMasteryTooltip.value = false
+  copyStatus.value = {}
+  recordingsList.value = {}
+  newNoteText.value = {}
+  showInlineCompletion.value = {}
+  inlineCompletion.value = {}
+  completionDebounceTimer.value = {}
+  editingNoteId.value = null
+  editingNoteText.value = ''
+  notesError.value = null
+  noteSuggestions.value = {}
+  isGettingSuggestions.value = {}
+  suggestionError.value = {}
+  noteTextareaRefs.value = {}
 }
 
 // 统一的数据加载函数
