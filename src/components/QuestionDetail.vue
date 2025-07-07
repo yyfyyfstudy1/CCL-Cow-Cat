@@ -56,7 +56,15 @@
                 </div>
                 <div class="dialog-header-row">
                     <div style="display:flex;align-items:center;gap:8px;">
-                        <h3 style="margin:0;">对话 {{ idx + 1 }}</h3>
+                        <h3 style="margin:0;">
+                          对话
+                          <template v-if="isFavoritesMode">
+                            {{ getGlobalDialogIndex(dialog) }}
+                          </template>
+                          <template v-else>
+                            {{ idx + 1 }}
+                          </template>
+                        </h3>
                         <template v-if="dialog.original.isQuestion == 1 && isLoggedIn">
                             <button v-if="!isFavoritesMode"
                                 class="favorite-btn"
@@ -343,6 +351,22 @@
         <div v-if="showRecordError" class="record-error-toast">
             {{ recordError }}
         </div>
+        <div v-if="isFavoritesMode && totalPages > 1" class="pagination-bar-new">
+            <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">&lt;</button>
+            <template v-for="(p, idx) in paginationRange" :key="idx">
+              <button
+                v-if="p !== '...'"
+                class="page-btn"
+                :class="{ active: p === currentPage }"
+                @click="currentPage = p"
+                :disabled="p === currentPage"
+              >{{ p }}</button>
+              <span v-else class="page-ellipsis">...</span>
+            </template>
+            <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">&gt;</button>
+            <input v-model="jumpPageInput" type="number" min="1" :max="totalPages" class="page-jump-input" @keydown.enter="handleJumpPage" placeholder="跳转页" />
+            <button class="page-btn" @click="handleJumpPage">跳转</button>
+        </div>
     </div>
 </template>
 
@@ -420,6 +444,49 @@ const S3_AUDIO_PATH = import.meta.env.VITE_S3_AUDIO_PATH || '/audio';
 // 收藏相关
 const favoriteIds = ref([])
 const favoriteMasteries = ref({}); // 新增：存储收藏对话的熟练度
+
+// 分页相关（仅收藏模式）
+const pageSize = 20
+const currentPage = ref(1)
+const totalPages = ref(1)
+const allFavoriteItems = ref([]) // 所有收藏元数据
+
+// 新增：分页跳转输入
+const jumpPageInput = ref('')
+
+// 新增：美观分页页码生成逻辑
+const paginationRange = computed(() => {
+  const total = totalPages.value
+  const current = currentPage.value
+  const delta = 2 // 当前页前后显示的页数
+  const range = []
+  let left = Math.max(1, current - delta)
+  let right = Math.min(total, current + delta)
+
+  if (current <= delta + 2) {
+    right = Math.min(total, 1 + 2 * delta + 1)
+  }
+  if (current >= total - delta - 1) {
+    left = Math.max(1, total - 2 * delta - 1)
+  }
+
+  for (let i = left; i <= right; i++) {
+    range.push(i)
+  }
+  if (left > 2) {
+    range.unshift('...')
+    range.unshift(1)
+  } else {
+    for (let i = 1; i < left; i++) range.unshift(i)
+  }
+  if (right < total - 1) {
+    range.push('...')
+    range.push(total)
+  } else {
+    for (let i = right + 1; i <= total; i++) range.push(i)
+  }
+  return range
+})
 
 // 页面数据（改为 ref）
 const pageTitle = ref('Untitled')
@@ -510,13 +577,78 @@ function audioSrc(rel) {
   return rel ? `${S3_BASE_URL}${S3_AUDIO_PATH}${rel}` : '';
 }
 
+// 新增：加载所有收藏元数据并排序
+async function loadAllFavoritesMeta() {
+  const favoriteItems = await getAllFavorites() // 只拿id/mastery/createdAt
+  // 全局排序
+  favoriteItems.sort((a, b) => {
+    if (currentSortMode.value === 'createdAt') {
+      return sortOrder.value === 'desc' ? b.createdAt - a.createdAt : a.createdAt - b.createdAt
+    } else if (currentSortMode.value === 'mastery') {
+      return sortOrder.value === 'desc' ? b.mastery - a.mastery : a.mastery - b.mastery
+    }
+    return 0
+  })
+  allFavoriteItems.value = favoriteItems
+  totalPages.value = Math.max(1, Math.ceil(favoriteItems.length / pageSize))
+  favoriteIds.value = favoriteItems.map(item => String(item.id))
+  favoriteMasteries.value = favoriteItems.reduce((acc, item) => {
+    acc[String(item.id)] = item.mastery
+    return acc
+  }, {})
+}
+
+// 新增：只加载当前页的题目和答案
+async function loadCurrentPageDialogs() {
+  const start = (currentPage.value - 1) * pageSize
+  const end = start + pageSize
+  const pageItems = allFavoriteItems.value.slice(start, end)
+
+  dialogs.value = pageItems.map(item => {
+    const id = String(item.id)
+    // 找到原始对话行（题目）
+    const originalRow = data.rows.find(r => String(r.id) === id)
+    // 找到对应的答案行
+    let translationRow = null
+    if (originalRow) {
+      const rowsForQid = data.byQid[originalRow.qid] || []
+      const originalIndex = rowsForQid.findIndex(r => String(r.id) === id)
+      if (originalIndex !== -1) {
+        if (originalIndex + 1 < rowsForQid.length) {
+          translationRow = rowsForQid[originalIndex + 1]
+        }
+      }
+    }
+    return {
+      original: {
+        text: originalRow?.text || '',
+        audio: originalRow?.audio1 || '',
+        isQuestion: 1,
+        id: id,
+        associatedQid: originalRow?.qid || null,
+        associatedTitle: originalRow?.title || '未知题目'
+      },
+      translation: {
+        text: translationRow?.text || '',
+        audio: translationRow?.audio1 || ''
+      },
+      mastery: item.mastery,
+      createdAt: item.createdAt,
+      showNotes: false,
+      dialogNotes: [],
+      qid: originalRow?.qid || null,
+      title: originalRow?.title || '未知题目',
+      type: originalRow?.type || ''
+    }
+  })
+}
+
 // 统一的数据加载函数
 async function loadPageData() {
   error.value = null
   try {
     await loadExcel() // 确保 Excel 数据已加载
 
-    // 如果未登录且处于收藏模式，则不加载收藏
     if (!isLoggedIn.value && isFavoritesMode.value) {
         pageTitle.value = '我的收藏对话 (请登录)';
         dialogs.value = []; // 清空对话列表
@@ -524,97 +656,10 @@ async function loadPageData() {
     }
 
     if (isFavoritesMode.value) {
-      // 收藏模式：加载所有收藏id及熟练度，构造dialogs
-      const favoriteItems = await getAllFavorites()
-      favoriteIds.value = favoriteItems.map(item => String(item.id))
-      favoriteMasteries.value = favoriteItems.reduce((acc, item) => {
-        acc[String(item.id)] = item.mastery
-        return acc
-      }, {})
-
-      dialogs.value = favoriteItems.map(item => {
-        const id = String(item.id)
-        // 找到原始对话行（题目）
-        const originalRow = data.rows.find(r => String(r.id) === id)
-
-        // 找到对应的答案行
-        let translationRow = null
-        if (originalRow) {
-          // 根据原始行的 qid 找到所有相关行
-          const rowsForQid = data.byQid[originalRow.qid] || []
-          // 找到原始行在数组中的索引
-          const originalIndex = rowsForQid.findIndex(r => String(r.id) === id)
-          if (originalIndex !== -1) {
-            // 题目后面一定是答案
-            if (originalIndex + 1 < rowsForQid.length) {
-              translationRow = rowsForQid[originalIndex + 1]
-            }
-          }
-        }
-
-        // 添加打印语句
-        console.log(`\n收藏对话 ${id} 的翻译内容：`)
-        console.log('原文：', originalRow?.text || '无原文')
-        console.log('翻译：', translationRow?.text || '无翻译')
-        console.log('-------------------')
-
-        return {
-          original: {
-            text: originalRow?.text || '',
-            audio: originalRow?.audio1 || '',
-            isQuestion: 1, // 收藏的总是题目
-            id: id,
-            associatedQid: originalRow?.qid || null,
-            associatedTitle: originalRow?.title || '未知题目'
-          },
-          translation: {
-            text: translationRow?.text || '',
-            audio: translationRow?.audio1 || ''
-          },
-          mastery: item.mastery,
-          createdAt: item.createdAt,
-          showNotes: false,
-          dialogNotes: [],
-          qid: originalRow?.qid || null,
-          title: originalRow?.title || '未知题目',
-          type: originalRow?.type || ''
-        }
-      })
-
-      // 根据当前排序模式对对话进行排序
-      if (isFavoritesMode.value) {
-        // 保存原始顺序的录音列表
-        const originalRecordings = { ...recordingsList.value }
-
-        // 对对话进行排序
-        dialogs.value.sort((a, b) => {
-          if (currentSortMode.value === 'createdAt') {
-            // 按添加时间排序
-            const timeA = a.createdAt || 0
-            const timeB = b.createdAt || 0
-            return sortOrder.value === 'desc' ? timeB - timeA : timeA - timeB
-          } else if (currentSortMode.value === 'mastery') {
-            // 按熟练度排序
-            const masteryA = a.mastery || 0
-            const masteryB = b.mastery || 0
-            return sortOrder.value === 'desc' ? masteryB - masteryA : masteryA - masteryB
-          }
-          return 0
-        })
-
-        // 重新映射录音列表到新的顺序
-        const newRecordings = {}
-        dialogs.value.forEach((dialog, newIndex) => {
-          const originalIndex = dialog.original.id
-          if (originalRecordings[originalIndex]) {
-            newRecordings[newIndex] = originalRecordings[originalIndex]
-          }
-        })
-        recordingsList.value = newRecordings
-      }
-
-      pageTitle.value = '我的收藏对话' // 收藏页面标题
-      // 其他收藏页面特有的标题/信息可以设置，这里暂不设置 intro, type, date, extraMention
+      // 分页收藏模式
+      await loadAllFavoritesMeta()
+      await loadCurrentPageDialogs()
+      pageTitle.value = '我的收藏对话'
     } else {
       // 普通模式：根据 qid 加载数据
       const currentQid = route.params.qid
@@ -666,9 +711,24 @@ async function loadPageData() {
   }
 }
 
-// 监听路由变化，重新加载数据
+// 监听分页、排序变化，自动加载当前页
+watch([currentPage, currentSortMode, sortOrder], async ([newPage, newSort, newOrder], [oldPage, oldSort, oldOrder]) => {
+  if (isFavoritesMode.value) {
+    await loadAllFavoritesMeta()
+    await loadCurrentPageDialogs()
+    // 加载笔记
+    for (const dialog of dialogs.value) {
+      if (dialog.original && dialog.original.id) {
+        await loadNotes(dialog)
+      }
+    }
+  }
+})
+
+// 监听路由变化，重置分页
 watch(() => route.fullPath, (newPath, oldPath) => {
   if (newPath !== oldPath) {
+    currentPage.value = 1
     loadPageData()
   }
 }, { immediate: true })
@@ -1466,6 +1526,23 @@ watch(newNoteText, (val) => {
 }, { deep: true })
 
 const isMobile = window.innerWidth < 768 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+function handleJumpPage() {
+  let page = parseInt(jumpPageInput.value)
+  if (isNaN(page)) return
+  if (page < 1) page = 1
+  if (page > totalPages.value) page = totalPages.value
+  currentPage.value = page
+  jumpPageInput.value = ''
+}
+
+// 新增：全局对话序号（仅收藏模式）
+function getGlobalDialogIndex(dialog) {
+  if (!isFavoritesMode.value) return null
+  // 在全局排序后的 allFavoriteItems 中查找该对话的全局序号
+  const idx = allFavoriteItems.value.findIndex(item => String(item.id) === String(dialog.original.id))
+  return idx !== -1 ? idx + 1 : null
+}
 </script>
 
 <style scoped>
@@ -2810,5 +2887,59 @@ h3 {
     margin-bottom: 2px;
     letter-spacing: 0.2px;
     margin-top: 8px;
+}
+
+.pagination-bar-new {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin: 24px 0;
+}
+
+.page-btn {
+  min-width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 12px;
+  background: #f6f8fa;
+  color: #333;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  margin: 0 2px;
+  outline: none;
+}
+
+.page-btn.active,
+.page-btn:disabled {
+  background: #409eff;
+  color: #fff;
+  font-weight: bold;
+  cursor: default;
+}
+
+.page-btn:disabled:not(.active) {
+  background: #eaeaea;
+  color: #bbb;
+}
+
+.page-ellipsis {
+  min-width: 38px;
+  text-align: center;
+  color: #888;
+  font-size: 18px;
+  user-select: none;
+}
+
+.page-jump-input {
+  width: 60px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #d0d7de;
+  text-align: center;
+  font-size: 15px;
+  margin-left: 8px;
+  margin-right: 2px;
 }
 </style>
