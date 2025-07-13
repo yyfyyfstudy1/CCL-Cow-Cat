@@ -182,11 +182,23 @@
 
                     <!-- 添加新笔记 -->
                     <div class="add-note-container">
+                        <div class="note-input-header">
+                            <div class="note-input-label">添加笔记</div>
+                            <div class="note-settings">
+                                <button 
+                                    class="note-settings-btn" 
+                                    @click="showNoteSettings = true"
+                                    title="笔记设置"
+                                >
+                                    <span class="material-icons">settings</span>
+                                </button>
+                            </div>
+                        </div>
                         <div class="note-input-row">
                             <div class="note-input-wrapper">
                                 <textarea
                                     v-model="newNoteText[dialog.original.id]"
-                                    placeholder="记录你的笔记... (输入内容后会自动显示智能补全，按Tab键接受补全)"
+                                    :placeholder="autoCompletionEnabled ? '记录你的笔记... (输入内容后会自动显示智能补全，按Tab键接受补全)' : '记录你的笔记...'"
                                     class="note-textarea"
                                     rows="3"
                                     @keydown="handleNoteKeydown($event, dialog)"
@@ -197,7 +209,7 @@
                         </div>
 
                         <!-- 智能补全显示 -->
-                        <template v-if="showInlineCompletion[dialog.original.id] && inlineCompletion[dialog.original.id]">
+                        <template v-if="autoCompletionEnabled && showInlineCompletion[dialog.original.id] && inlineCompletion[dialog.original.id]">
                             <div class="completion-hint-top-outer">点击或按Tab下方提示框补全</div>
                             <div class="external-completion"
                                  @click="applyInlineCompletion(dialog)"
@@ -354,6 +366,34 @@
         <div v-if="showRecordError" class="record-error-toast">
             {{ recordError }}
         </div>
+        
+        <!-- 笔记设置模态框 -->
+        <div v-if="showNoteSettings" class="note-settings-modal">
+            <div class="note-settings-content">
+                <div class="note-settings-header">
+                    <span>笔记设置</span>
+                    <button class="close-btn" @click="showNoteSettings = false">
+                        <span class="material-icons">close</span>
+                    </button>
+                </div>
+                <div class="note-settings-body">
+                    <div class="setting-item">
+                        <label class="setting-label">
+                            <input 
+                                type="checkbox" 
+                                v-model="autoCompletionEnabled" 
+                                @change="saveNoteSettings"
+                            />
+                            <span class="setting-text">启用智能补全</span>
+                        </label>
+                        <div class="setting-description">
+                            开启后，在输入笔记时会自动提供智能补全建议
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <div v-if="isFavoritesMode && totalPages > 1" class="pagination-bar-new">
             <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">&lt;</button>
             <template v-for="(p, idx) in paginationRange" :key="idx">
@@ -383,6 +423,7 @@ import { markAsLearned } from '../services/learned.js'
 import { getNotes, addNote, updateNote, deleteNote, saveDialogContent } from '../services/notes.js'
 import { getAuth, onAuthStateChanged } from 'firebase/auth' // 导入 Firebase Auth
 import { uploadAudioToLambda } from '@/services/googleDrive'
+import { saveNotesSettings, getNotesSettings } from '../services/userSettings.js'
 import autosize from 'autosize'
 import { nextTick } from 'vue'
 import { addPracticeLog } from '@/services/practiceLogs'
@@ -424,6 +465,10 @@ const suggestionError = ref({}) // 存储每个对话的提示错误信息
 const showInlineCompletion = ref({}) // 控制是否显示内联补全
 const inlineCompletion = ref({}) // 存储内联补全内容
 const completionDebounceTimer = ref({}) // 防抖定时器
+
+// 新增：笔记设置相关状态
+const showNoteSettings = ref(false) // 控制笔记设置模态框显示
+const autoCompletionEnabled = ref(true) // 默认启用智能补全
 
 // 存储所有录音及其转录
 // recordingsList: { [dialogIdx]: [ { url, text, timestamp, aiCheck } ] }
@@ -661,6 +706,11 @@ async function loadCurrentPageDialogs() {
   isGettingSuggestions.value = {}
   suggestionError.value = {}
   noteTextareaRefs.value = {}
+  
+  // 清除所有定时器
+  Object.values(completionDebounceTimer.value).forEach(timer => {
+    if (timer) clearTimeout(timer)
+  })
 }
 
 // 统一的数据加载函数
@@ -760,6 +810,10 @@ onMounted(() => {
     isLoggedIn.value = !!user
     // 登录状态变化时重新加载页面数据，以更新收藏/笔记可见性
     loadPageData()
+    // 加载笔记设置
+    if (user) {
+      loadNoteSettings()
+    }
   })
 
   chimeAudio.value = new Audio('/chime.mp4')
@@ -1390,6 +1444,11 @@ function clearSuggestion(dialogId) {
 async function handleNoteInput(event, dialog) {
   const dialogId = dialog.original.id;
 
+  // 如果智能补全功能被禁用，直接返回
+  if (!autoCompletionEnabled.value) {
+    return;
+  }
+
   // 清除之前的定时器
   if (completionDebounceTimer.value[dialogId]) {
     clearTimeout(completionDebounceTimer.value[dialogId]);
@@ -1431,7 +1490,8 @@ function handleNoteKeydown(event, dialog) {
   if (event.key === 'Tab') {
     event.preventDefault();
 
-    if (showInlineCompletion.value[dialogId] && inlineCompletion.value[dialogId]) {
+    // 只有在启用智能补全时才处理Tab键补全
+    if (autoCompletionEnabled.value && showInlineCompletion.value[dialogId] && inlineCompletion.value[dialogId]) {
       // 应用内联补全
       applyInlineCompletion(dialog);
     }
@@ -1562,6 +1622,48 @@ function getGlobalDialogIndex(dialog) {
   // 在全局排序后的 allFavoriteItems 中查找该对话的全局序号
   const idx = allFavoriteItems.value.findIndex(item => String(item.id) === String(dialog.original.id))
   return idx !== -1 ? idx + 1 : null
+}
+
+// 新增：加载笔记设置
+async function loadNoteSettings() {
+  try {
+    if (isLoggedIn.value) {
+      // 用户已登录，从云端加载设置
+      const settings = await getNotesSettings()
+      if (settings) {
+        autoCompletionEnabled.value = settings.autoCompletionEnabled ?? true
+      } else {
+        // 如果云端没有设置，尝试从本地存储加载
+        const localSetting = localStorage.getItem('noteAutoCompletionEnabled')
+        autoCompletionEnabled.value = localSetting !== null ? localSetting === 'true' : true
+      }
+    } else {
+      // 用户未登录，从本地存储加载设置
+      const localSetting = localStorage.getItem('noteAutoCompletionEnabled')
+      autoCompletionEnabled.value = localSetting !== null ? localSetting === 'true' : true
+    }
+  } catch (e) {
+    console.error('加载笔记设置失败:', e)
+    // 出错时从本地存储加载，如果也没有则使用默认值
+    const localSetting = localStorage.getItem('noteAutoCompletionEnabled')
+    autoCompletionEnabled.value = localSetting !== null ? localSetting === 'true' : true
+  }
+}
+
+// 新增：保存笔记设置
+async function saveNoteSettings() {
+  try {
+    // 如果用户已登录，保存到云端
+    if (isLoggedIn.value) {
+      await saveNotesSettings({
+        autoCompletionEnabled: autoCompletionEnabled.value
+      })
+    }
+    // 同时保存到本地存储作为备份
+    localStorage.setItem('noteAutoCompletionEnabled', autoCompletionEnabled.value.toString())
+  } catch (e) {
+    console.error('保存笔记设置失败:', e)
+  }
 }
 </script>
 
@@ -2961,5 +3063,145 @@ h3 {
   font-size: 15px;
   margin-left: 8px;
   margin-right: 2px;
+}
+
+/* 笔记设置相关样式 */
+.note-input-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.note-input-label {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.note-settings {
+  display: flex;
+  align-items: center;
+}
+
+.note-settings-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #666;
+  transition: color 0.2s;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.note-settings-btn:hover {
+  color: #007bff;
+  background-color: #f0f0f0;
+}
+
+.note-settings-btn .material-icons {
+  font-size: 18px;
+}
+
+.note-settings-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.note-settings-content {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  padding: 24px;
+  min-width: 400px;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.note-settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.note-settings-header span {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.note-settings-header .close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #666;
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.note-settings-header .close-btn:hover {
+  background: #f0f0f0;
+  color: #d32f2f;
+}
+
+.note-settings-header .material-icons {
+  font-size: 20px;
+}
+
+.note-settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.setting-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 16px;
+  color: #333;
+}
+
+.setting-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.setting-text {
+  font-weight: 500;
+}
+
+.setting-description {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.4;
+  margin-left: 30px;
 }
 </style>
