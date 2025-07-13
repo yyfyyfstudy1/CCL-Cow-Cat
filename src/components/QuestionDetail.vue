@@ -988,6 +988,23 @@ async function startRecording(dialogId) {
     })
     const url = URL.createObjectURL(blob)
 
+    // ====== 新增：节流逻辑，判断录音时长 ======
+    const audio = new Audio(url)
+    const duration = await new Promise((resolve) => {
+      audio.addEventListener('loadedmetadata', () => {
+        resolve(audio.duration)
+      })
+    })
+    if (!duration || duration < 2) {
+      recordError.value = '录音时间太短，请录制2秒以上的语音。'
+      showRecordError.value = true
+      setTimeout(() => { showRecordError.value = false }, 2000)
+      // 释放资源
+      URL.revokeObjectURL(url)
+      return
+    }
+    // ====== 节流逻辑结束 ======
+
     const originalText = dialogs.value[dialogId]?.original.text || ''
     let translatedText = '未转录'
     let aiCheckResult = null
