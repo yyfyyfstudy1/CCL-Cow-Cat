@@ -37,8 +37,11 @@
             <div v-else class="favorites-header">
                 <h2 class="title">{{ pageTitle }}</h2>
                 <div class="sort-controls">
-                    <button class="sort-btn" @click="toggleSortMode">
+                    <!-- <button class="sort-btn" @click="toggleSortMode">
                         排序：<span>{{ currentSortMode === 'createdAt' ? '添加时间' : '熟练度' }}</span>
+                    </button> -->
+                    <button class="sort-btn" disabled>
+                        排序：<span>添加时间</span>
                     </button>
                     <button class="sort-order-btn" @click="toggleSortOrder">
                         <span class="material-icons sort-icon">

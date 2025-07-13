@@ -14,6 +14,7 @@
     <FeedbackModal :show="showFeedbackModal" @close="showFeedbackModal = false" />
     <VersionChecker />
     <FeatureVideoModal :visible="showFeatureVideo" @close="handleClose" />
+    <MobileDrawingBoard />
 </template>
 
 <script setup>
@@ -28,6 +29,7 @@ import UserGuide from './components/UserGuide.vue';
 import FeedbackModal from './components/FeedbackModal.vue';
 import VersionChecker from './components/VersionChecker.vue';
 import FeatureVideoModal from './components/FeatureVideoModal.vue';
+import MobileDrawingBoard from './components/MobileDrawingBoard.vue';
 import { useEventBus } from './services/eventBus.js';
 import { useData } from './services/useData.js';
 
