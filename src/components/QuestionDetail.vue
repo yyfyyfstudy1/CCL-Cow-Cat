@@ -414,7 +414,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useData } from '../services/useData.js'
 import { checkTranslation, transcribeAudio, getNoteSuggestions, getSmartCompletion } from '../services/openai.js'
@@ -784,6 +784,7 @@ async function loadPageData() {
 // 监听分页、排序变化，自动加载当前页
 watch([currentPage, currentSortMode, sortOrder], async ([newPage, newSort, newOrder], [oldPage, oldSort, oldOrder]) => {
   if (isFavoritesMode.value) {
+    cleanupRecording()
     await loadAllFavoritesMeta()
     await loadCurrentPageDialogs()
     // 加载笔记
@@ -823,6 +824,21 @@ onMounted(() => {
   }
   // 自动恢复音频加载
   document.addEventListener('visibilitychange', handleVisibilityChange)
+})
+
+function cleanupRecording() {
+  if (mediaRecorder.value && isRecording.value) {
+    mediaRecorder.value.stream.getTracks().forEach(track => track.stop())
+    isRecording.value = false
+    isApiLoading.value = false
+    transcribingStatus.value = 'idle'
+    currentTranscribingDialogId.value = null
+    audioChunks.value = []
+  }
+}
+
+onBeforeUnmount(() => {
+  cleanupRecording()
 })
 
 onUnmounted(() => {
