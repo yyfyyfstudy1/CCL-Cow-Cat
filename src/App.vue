@@ -80,7 +80,7 @@ const openLoginModal = () => {
     isLoginModalOpen.value = true;
 };
 
-const FEATURE_VIDEO_VERSION = '2024-06-09'; // 有新视频时修改此版本号
+const FEATURE_VIDEO_VERSION = '2024-07-29'; // 有新视频时修改此版本号
 
 onMounted(() => {
     const onResize = () => isMobile.value = window.innerWidth < 768;
