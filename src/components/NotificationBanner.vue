@@ -1,75 +1,100 @@
 <template>
-    <div v-if="showNotification" class="notification">
-        <div class="notification-content">
-            <p>还有其他想要的功能可以反馈给我（但我不一定有空做 🐒🐒🐒）。移动端的部分布局暂时没空做适配了，大家可以选择的话还是在电脑上使用更好</p>
-            <button @click="closeNotification" class="notification-close">知道了</button>
-        </div>
+  <transition name="slide-fade">
+    <div v-if="showDataUpdateNotification" class="notification-banner">
+      <div class="banner-content">
+        <span class="material-icons">refresh</span>
+        <span>数据已更新至最新版本 ({{ lastUpdated }})</span>
+      </div>
+      <button @click="hideNotification" class="close-btn">×</button>
     </div>
+  </transition>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch } from 'vue';
+import { useData } from '../services/useData.js';
 
-const showNotification = ref(false)
+const { data } = useData();
+const showDataUpdateNotification = ref(false);
+const lastUpdated = ref('');
+const lastRefreshTime = ref('');
 
-const emit = defineEmits(['closed'])
-
-onMounted(() => {
-    const hasShownNotification = localStorage.getItem('hasShownNotification_v2')
-    if (!hasShownNotification) {
-        showNotification.value = true
-    } else {
-        emit('closed')
+// 监听数据更新
+watch(() => data.lastUpdated, (newUpdateTime) => {
+  if (newUpdateTime && newUpdateTime !== lastUpdated.value) {
+    // 检查是否是真正的刷新（通过比较刷新时间）
+    const currentRefreshTime = localStorage.getItem('excel_last_refresh');
+    if (currentRefreshTime && currentRefreshTime !== lastRefreshTime.value) {
+      lastUpdated.value = newUpdateTime;
+      lastRefreshTime.value = currentRefreshTime;
+      showDataUpdateNotification.value = true;
+      
+      // 3秒后自动隐藏
+      setTimeout(() => {
+        showDataUpdateNotification.value = false;
+      }, 3000);
     }
-})
+  }
+}, { immediate: true });
 
-function closeNotification() {
-    showNotification.value = false
-    localStorage.setItem('hasShownNotification_v2', 'true')
-    emit('closed')
-}
+const hideNotification = () => {
+  showDataUpdateNotification.value = false;
+};
 </script>
 
 <style scoped>
-.notification {
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1000;
-    width: 90%;
-    max-width: 600px;
-    background: #fff;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    padding: 16px;
-    margin-bottom: 20px;
+.notification-banner {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #4CAF50;
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  z-index: 30000;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  max-width: 90vw;
 }
 
-.notification-content {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+.banner-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
 }
 
-.notification-content p {
-    margin: 0;
-    color: #333;
-    line-height: 1.5;
+.close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
 }
 
-.notification-close {
-    align-self: flex-end;
-    padding: 8px 16px;
-    background: #1976d2;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background 0.2s;
+.close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
 }
 
-.notification-close:hover {
-    background: #1565c0;
+.slide-fade-enter-active,
+.slide-fade-leave-active {
+  transition: all 0.5s ease;
+}
+
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  transform: translate(-50%, -100px);
+  opacity: 0;
 }
 </style>

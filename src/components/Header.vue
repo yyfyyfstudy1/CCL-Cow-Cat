@@ -101,38 +101,36 @@ const openFeedback = () => {
 
 <style scoped>
 .header {
-    background: white;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
-    z-index: 100;
-    height: 46px;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    padding: 12px 0;
 }
 
 .container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 0 16px;
+    padding: 0 20px;
     display: flex;
-    align-items: center;
     justify-content: space-between;
-    height: 100%;
+    align-items: center;
 }
 
 .logo-container {
     display: flex;
     align-items: center;
-    gap: 8px;
     text-decoration: none;
     color: inherit;
+    gap: 12px;
 }
 
 .logo {
-    width: 40px;
-    height: 40px;
-    object-fit: contain;
+    width: 32px;
+    height: 32px;
 }
 
 .site-title {
@@ -144,26 +142,26 @@ const openFeedback = () => {
 .header-right-icons {
     display: flex;
     align-items: center;
-    gap: 16px; /* 调整图标与头像之间的间距 */
+    gap: 8px;
 }
 
 .icon-button {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: none;
+    border-radius: 8px;
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 40px; /* 与头像保持一致 */
-    height: 40px; /* 与头像保持一致 */
-    border-radius: 50%;
-    border: none; /* 移除边框 */
+    transition: background-color 0.2s;
     color: #666;
     text-decoration: none;
-    transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
-    background-color: #f8f8f8; /* 新增：灰色背景 */
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 新增：与头像相似的阴影 */
 }
 
 .icon-button:hover {
-    background-color: #f0f0f0;
+    background-color: #f5f5f5;
     color: #333;
 }
 
@@ -172,8 +170,25 @@ const openFeedback = () => {
 }
 
 @media (max-width: 768px) {
+    .container {
+        padding: 0 16px;
+    }
+    
     .site-title {
-        display: none;
+        font-size: 18px;
+    }
+    
+    .header-right-icons {
+        gap: 4px;
+    }
+    
+    .icon-button {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .icon-button .material-icons {
+        font-size: 24px;
     }
 }
 </style>

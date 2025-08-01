@@ -33,7 +33,7 @@ import MobileDrawingBoard from './components/MobileDrawingBoard.vue';
 import { useEventBus } from './services/eventBus.js';
 import { useData } from './services/useData.js';
 
-const { loadExcel } = useData();
+const { refreshExcel, loadExcel } = useData();
 
 const { on } = useEventBus();
 const showMp3Poll = ref(false);
@@ -87,6 +87,17 @@ onMounted(() => {
     window.addEventListener('resize', onResize);
     onUnmounted(() => window.removeEventListener('resize', onResize));
 
+    // 添加页面可见性监听，当用户回到页面时检查是否需要刷新数据
+    const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+            console.log('页面重新可见，检查是否需要刷新Excel数据...');
+            // 使用loadExcel而不是refreshExcel，让它自动判断是否需要刷新
+            loadExcel();
+        }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    onUnmounted(() => document.removeEventListener('visibilitychange', handleVisibilityChange));
+
     const hasSeenGuide = localStorage.getItem('hasSeenUserGuide') === 'true';
     const watchedVersion = localStorage.getItem('featureVideoVersion');
     if (watchedVersion !== FEATURE_VIDEO_VERSION) {
@@ -97,7 +108,7 @@ onMounted(() => {
         }, 500);
     }
 
-    loadExcel();
+    loadExcel(); // 使用loadExcel而不是refreshExcel，让它自动判断是否需要刷新
     on('open-login-modal', openLoginModal);
     on('start-user-guide', () => {
         showGuide.value = true;
