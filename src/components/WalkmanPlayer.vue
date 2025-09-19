@@ -151,7 +151,7 @@ const repeatCount   = ref(1)
 /* ------------------------------------------- */
 
 /* -------------- 内部状态 (Internal State) -------------- */
-const { data, loadExcel } = useData()
+const { data, loadData } = useData()
 const currentDialogs     = ref([])
 const currentDialogIndex = ref(0)
 const isPlaying      = ref(false)
@@ -433,7 +433,7 @@ onMounted(() => {
     window.addEventListener('walkman-play-qid', onPlayQidEvent);
 
     if (!data.loaded) {
-        loadExcel();
+        loadData();
     }
 
     const auth = getAuth();

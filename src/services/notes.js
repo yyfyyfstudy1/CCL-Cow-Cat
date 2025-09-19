@@ -14,6 +14,41 @@ export async function getNotes(dialogId) {
   return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
 }
 
+// 批量获取多个对话的笔记
+export async function getBatchNotes(dialogIds) {
+  const user = getAuth().currentUser
+  if (!user) throw new Error('未登录')
+  
+  // 并行请求所有对话的笔记
+  const notesPromises = dialogIds.map(async (dialogId) => {
+    try {
+      const notesColRef = collection(db, 'users', user.uid, 'dialogs', String(dialogId), 'notes')
+      const q = query(notesColRef, orderBy('createdAt', 'desc'))
+      const snap = await getDocs(q)
+      return {
+        dialogId: String(dialogId),
+        notes: snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      }
+    } catch (error) {
+      console.error(`获取对话 ${dialogId} 笔记失败:`, error)
+      return {
+        dialogId: String(dialogId),
+        notes: []
+      }
+    }
+  })
+  
+  const results = await Promise.all(notesPromises)
+  
+  // 转换为 dialogId -> notes 的映射
+  const notesMap = {}
+  results.forEach(result => {
+    notesMap[result.dialogId] = result.notes
+  })
+  
+  return notesMap
+}
+
 // 添加笔记
 export async function addNote(dialogId, text) {
   const user = getAuth().currentUser

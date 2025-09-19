@@ -103,7 +103,7 @@ import { QuestionHeader, DialogItem, PaginationBar, NoteSettingsModal } from './
 import { checkTranslation, transcribeAudio, getNoteSuggestions, getSmartCompletion } from '../services/openai.js'
 import { addFavorite, removeFavorite, getAllFavorites } from '../services/favorites.js'
 import { markAsLearned } from '../services/learned.js'
-import { getNotes, addNote, updateNote, deleteNote, saveDialogContent } from '../services/notes.js'
+import { getNotes, getBatchNotes, addNote, updateNote, deleteNote, saveDialogContent } from '../services/notes.js'
 import { getAuth, onAuthStateChanged } from 'firebase/auth' // 导入 Firebase Auth
 import { uploadAudioToLambda } from '@/services/googleDrive'
 import { saveNotesSettings, getNotesSettings } from '../services/userSettings.js'
@@ -168,7 +168,7 @@ const isCancelled = ref(false)
 // 添加提示框状态
 const showNotification = ref(false)
 
-const { loadFromFirestore, data } = useData()
+const { loadData, data } = useData()
 const S3_BASE_URL = "https://cclcowcatresource.s3.ap-southeast-2.amazonaws.com";
 const S3_AUDIO_PATH = import.meta.env.VITE_S3_AUDIO_PATH || '/audio';
 
@@ -364,7 +364,7 @@ async function loadCurrentPageDialogs() {
 async function loadPageData() {
   error.value = null
   try {
-    await loadFromFirestore() // 确保 Firestore 数据已加载
+    await loadData() // 确保数据已加载
 
     if (!isLoggedIn.value && isFavoritesMode.value) {
         pageTitle.value = '我的收藏对话 (请登录)';
@@ -415,12 +415,8 @@ async function loadPageData() {
     // 无论哪种模式，都加载收藏状态
     await loadFavorites()
 
-    // 在 dialogs.value 填充后，加载每个对话的笔记以显示初始计数
-    for (const dialog of dialogs.value) {
-      if (dialog.original && dialog.original.id) {
-        await loadNotes(dialog); // 这将填充 dialog.dialogNotes
-      }
-    }
+    // 批量加载所有对话的笔记
+    await loadAllNotes()
 
   } catch (e) {
     console.error('加载页面数据失败:', e)
@@ -434,12 +430,8 @@ watch([currentPage, currentSortMode, sortOrder], async ([newPage, newSort, newOr
     cleanupRecording()
     await loadAllFavoritesMeta()
     await loadCurrentPageDialogs()
-    // 加载笔记
-    for (const dialog of dialogs.value) {
-      if (dialog.original && dialog.original.id) {
-        await loadNotes(dialog)
-      }
-    }
+    // 批量加载笔记
+    await loadAllNotes()
   }
 })
 
@@ -984,15 +976,45 @@ function toggleSortOrder() {
   }
 }
 
-// 新增：加载笔记函数
+// 批量加载所有对话的笔记
+async function loadAllNotes() {
+  if (!isLoggedIn.value || !dialogs.value.length) return;
+  
+  notesError.value = null;
+  
+  try {
+    // 收集所有对话ID
+    const dialogIds = dialogs.value
+      .filter(dialog => dialog.original && dialog.original.id)
+      .map(dialog => dialog.original.id);
+    
+    if (dialogIds.length === 0) return;
+    
+    // 批量获取笔记
+    const notesMap = await getBatchNotes(dialogIds);
+    
+    // 将笔记分配给对应的对话
+    dialogs.value.forEach(dialog => {
+      if (dialog.original && dialog.original.id) {
+        dialog.dialogNotes = notesMap[dialog.original.id] || [];
+      }
+    });
+    
+    console.log(`批量加载完成：${dialogIds.length} 个对话的笔记`);
+    
+  } catch (e) {
+    console.error('批量加载笔记失败:', e);
+    notesError.value = e.message;
+  }
+}
+
+// 单个加载笔记函数（用于动态更新）
 async function loadNotes(dialog) {
-  notesError.value = null; // 清除之前的错误
-  if (!dialog || !dialog.original || !dialog.original.id) return; // 没有对话或ID则不加载笔记
+  notesError.value = null;
+  if (!dialog || !dialog.original || !dialog.original.id) return;
   try {
     dialog.dialogNotes = await getNotes(dialog.original.id);
-    // console.log(`对话 ${dialog.original.id} 的笔记已加载:`, dialog.dialogNotes);
   } catch (e) {
-    // console.error(`加载对话 ${dialog.original.id} 笔记失败:`, e);
     notesError.value = e.message;
   }
 }
