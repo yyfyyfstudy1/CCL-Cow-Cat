@@ -1,0 +1,5 @@
+com/ccl/cowcat/lambda/GoogleDriveUploader.class
+com/ccl/cowcat/lambda/GoogleDriveUploader$Input.class
+com/ccl/cowcat/lambda/OpenAIHandler$1.class
+com/ccl/cowcat/lambda/GoogleDriveUploader$Output.class
+com/ccl/cowcat/lambda/OpenAIHandler.class
