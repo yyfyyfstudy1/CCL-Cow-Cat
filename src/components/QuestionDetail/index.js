@@ -1,0 +1,6 @@
+export { default as QuestionHeader } from './QuestionHeader.vue'
+export { default as DialogItem } from './DialogItem.vue'
+export { default as NotesSection } from './NotesSection.vue'
+export { default as RecordingSection } from './RecordingSection.vue'
+export { default as PaginationBar } from './PaginationBar.vue'
+export { default as NoteSettingsModal } from './NoteSettingsModal.vue'
